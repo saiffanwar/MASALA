@@ -30,24 +30,45 @@ This repository contains implementation of the MASALA and CHILLI methods for exp
 The following options are included for the methods:
 
 `  -h, --help            show this help message and exit`
+
  ` -d DATASET, --dataset DATASET    Which dataset to work on` 
+
 `--model_type MODEL_TYPE  Which model to use`
+
 `-l LOAD_MODEL, --load_model LOAD_MODEL  Load the model from file`
- ` -m MODE, --mode MODE  Whether to generate ensembles or explanations.`
+
+ ` -m MODE, --mode MODE  Whether to generate ensembles or explanations.` 
+
 `  -e EXP_MODE, --exp_mode EXP_MODE       Which instances to generate explanations for.`
+
 `--sparsity SPARSITY   The sparsity threshold to use for the LLC explainer.`
+
 ` --coverage COVERAGE   The coverage threshold to use for the LLC explainer.`
+
 `--starting_k STARTING_K The number of neighbours to use for the LLC explainer.`
+
 `--neighbourhood NEIGHBOURHOOD  The neighbourhood threshold to use for the LLC explainer.
 `
+
 `-p PRIMARY_INSTANCE, --primary_instance PRIMARY_INSTANCE The instance to generate explanations for`
+
 ` -n NUM_INSTANCES, --num_instances NUM_INSTANCES  The number of instances to generate explanations for `
+
 `--c_id C_ID           Clustering ID`
+
 `--e_id E_ID           Experiment ID`  
+
 `--lime_exp LIME_EXP   Whether to generate LIME explanations `
+
 `--chilli_exp CHILLI_EXP  Whether to generate CHILLI explanations`
+
 `--llc_exp LLC_EXP     Whether to generate LLC explanations -kw KERNEL_WIDTH, `
+
 `--kernel_width KERNEL_WIDTH        The kernel width to use for the explanations `
+
 `--plots, --no-plots --results`
+
 `--no-results`
+
+
 
