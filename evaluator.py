@@ -70,12 +70,14 @@ def fidelities():
         chilli_instance_fidelity = []
         for kernel_width in kernel_widths:
             print(f'\n --------- Kernel Width: {kernel_width} --------')
-            with open(f'saved/results/{args.dataset}/{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}_kw={kernel_width}.pck', 'rb') as file:
-                results = pck.load(file)
 
-            for result, method in zip(results, ['LIME', 'CHILLI']):
+            for method in ['LIME', 'CHILLI']:
+                with open(f'saved/results/{args.dataset}/{method}_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}_kw={kernel_width}.pck', 'rb') as file:
+                    result = pck.load(file)
 
                 print(f'\n --------- {method} Results --------')
+                print(result['instance_indices'])
+                br
                 # Local Fidelity
                 local_fidelity_scores = []
                 for n in range(len(result['model_perturbation_predictions'])):
@@ -128,6 +130,9 @@ def fidelities():
     fig.legend(['LIME - Local', 'CHILLI - Local', 'LIME - Instance', 'CHILLI - Instance'], loc='upper center', ncols=2, bbox_to_anchor=(0.5, 1.30))
     fig.savefig(f'Figures/{args.dataset}_fidelities.pdf', bbox_inches='tight')
 
+def masala_fidelities():
+    for
+
 def print_tex_table(table_results):
     for kw in table_results.keys():
         row = f'& {kw} & '
@@ -145,9 +150,9 @@ def exp_variance_box_plot():
         variances = [[], []]
         for i, kernel_width in enumerate(kernel_widths):
             print(f'\n --------- Kernel Width: {kernel_width} --------')
-            with open(f'saved/results/{args.dataset}/{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}_kw={kernel_width}.pck', 'rb') as file:
-                results = pck.load(file)
-            for result, method in zip(results, ['LIME', 'CHILLI']):
+            for method in ['LIME', 'CHILLI']:
+                with open(f'saved/results/{args.dataset}/{method}_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}_kw={kernel_width}.pck', 'rb') as file:
+                    result = pck.load(file)
                 print(f'\n --------- {method} Results --------')
                 plot_num = ['LIME', 'CHILLI'].index(method)
                 sorted_explanations = []
@@ -211,9 +216,9 @@ def varying_interpretability(kernel_widths):
             chilli_instance_fidelity = {k: [] for k in range(len(features[args.dataset]))}
             lime_local_fidelity = {k: [] for k in range(len(features[args.dataset]))}
             lime_instance_fidelity = {k: [] for k in range(len(features[args.dataset]))}
-            with open(f'saved/results/{args.dataset}/{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}_kw={kernel_width}.pck', 'rb') as file:
-                results = pck.load(file)
-            for result, method in zip(results, ['LIME', 'CHILLI']):
+            for method in ['LIME', 'CHILLI']:
+                with open(f'saved/results/{args.dataset}/{method}_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}_kw={kernel_width}.pck', 'rb') as file:
+                    result = pck.load(file)
                 print(f'\n --------- {method} Results --------')
                 sorted_explanations = []
                 for n in range(len(result['model_perturbation_predictions'])):
@@ -270,16 +275,16 @@ def varying_interpretability(kernel_widths):
 for dataset in ['MIDAS', 'housing', 'webTRIS']:
     args.dataset = dataset
     if args.dataset == 'MIDAS':
-        models = ['GBR', 'SVR', 'RNN'][2:]
+        models = ['GBR', 'SVR', 'RNN']
     elif args.dataset == 'housing':
-        models = ['GBR', 'SVR', 'RF'][:1]
+        models = ['GBR', 'SVR', 'RF']
     elif args.dataset == 'PHM08':
         models = ['GBR', 'SVR', 'RF']
     elif args.dataset == 'webTRIS':
-        models = ['SVR', 'RF', 'GBR'][:1]
-#    fidelities()
+        models = ['SVR', 'RF', 'GBR']
+    fidelities()
 #    exp_variance_box_plot()
-    varying_interpretability(kernel_widths[:5])
+#    varying_interpretability(kernel_widths[:5])
 
 
 
