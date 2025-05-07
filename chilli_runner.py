@@ -46,7 +46,7 @@ else:
     print("GPU not available, CPU used")
 
 parser = argparse.ArgumentParser(description='Run the MIDAS model and generate explanations')
-parser.add_argument('-d', '--dataset', type=str, default='MIDAS', help='Which dataset to work on')
+parser.add_argument('-d', '--dataset', type=str, default='housing', help='Which dataset to work on')
 parser.add_argument('--model_type', type=str, default='GBR', help='Which dataset to work on')
 parser.add_argument('-l', '--load_model', type=str, default='y', help='Load the model from file')
 parser.add_argument('-m', '--mode', type=str, default='explain', help='Whether to generate ensembles or explanations.')
@@ -140,6 +140,7 @@ def main():
 
         manipulated_features = ['MedInc', 'HouseAge']
         manipulated_feature_idxs = [features.index(f) for f in manipulated_features]
+        sampling=True
 
     elif dataset == 'webTRIS':
         webtris_data = webtrisDataProcessing.DataProcessing(siteName='M6/7570A')
@@ -160,7 +161,7 @@ def main():
         y_test_pred = model(x_test)
         y_train_pred = model(x_train)
         discrete_features = ['Day', 'Time Interval']
-        sampling = False
+        sampling = True
 
 
 
@@ -169,12 +170,12 @@ def main():
 
     if sampling:
         R = np.random.RandomState(42)
-        random_samples = R.randint(2, len(x_test), 5000)
+        random_samples = R.randint(2, len(x_test), min(len(x_test), 5000))
 
         x_train = x_train[random_samples]
         y_train = y_train[random_samples]
         x_test = x_test[random_samples]
-        y_pred = y_test_pred[random_samples]
+        y_test_pred = y_test_pred[random_samples]
         y_test = y_test[random_samples]
         print(f'Training samples: {len(x_train)}')
         print(f'Test samples: {len(x_test)}')
@@ -216,118 +217,122 @@ def main():
         kernel_widths = [kernel_width]
 
 
-    for kernel_width in kernel_widths:
-        if args.chilli:
-            CHILLIExplainer = CHILLI(dataset, model, x_train, y_train, y_train_pred, x_test, y_test, y_test_pred, features, using_chilli=True)
-            CHILLIExplainer.build_explainer(mode='regression', kernel_width=kernel_width, categorical_features=categorical_features)
+    # MASALA does not need to be ran for all kernel_widths. Set to True once ran once.
+    masala_ran = False
 
-        if args.lime:
-            LIMEExplainer = CHILLI(dataset, model, x_train, y_train, y_train_pred, x_test, y_test, y_test_pred, features, using_chilli=False)
-            LIMEExplainer.build_explainer(mode='regression', kernel_width=kernel_width, categorical_features=categorical_features)
+#    for kernel_width in kernel_widths:
+    if args.chilli:
+        CHILLIExplainer = CHILLI(dataset, model, x_train, y_train, y_train_pred, x_test, y_test, y_test_pred, features, using_chilli=True)
+        CHILLIExplainer.build_explainer(mode='regression', kernel_width=kernel_width, categorical_features=categorical_features)
 
-        if args.masala:
-            MASALAExplainer = masala.MASALA(model, args.model_type, x_test, y_test, y_pred, dataset, features, discrete_features, sparsity_threshold=0.05, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.05)
+    if args.lime:
+        LIMEExplainer = CHILLI(dataset, model, x_train, y_train, y_train_pred, x_test, y_test, y_test_pred, features, using_chilli=False)
+        LIMEExplainer.build_explainer(mode='regression', kernel_width=kernel_width, categorical_features=categorical_features)
+
+    if args.masala:
+        MASALAExplainer = masala.MASALA(model, args.model_type, x_test, y_test, y_test_pred, dataset, features, discrete_features, sparsity_threshold=0.05, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.05)
 
 
-        chilli_results = {'features': features,
-                          'instance_indices': [],
-                          'instance_data': [],
-                          'exp_instance_prediction':[],
-                          'explanations':[],
-                          'perturbations': [],
-                          'model_perturbation_predictions':[],
-                          'exp_perturbation_predictions':[],
-                          'model_instance_prediction': []}
-        lime_results = {'features': features,
-                        'instance_indices': [],
-                        'instance_data': [],
-                        'exp_instance_prediction':[],
-                        'explanations':[],
-                        'perturbations': [],
-                        'model_perturbation_predictions':[],
-                        'exp_perturbation_predictions':[],
-                        'model_instance_prediction': []}
-        masala_results = {'features': features,
-                          'instance_indices': [],
-                          'instance_data': [],
-                          'exp_instance_prediction':[],
-                          'explanations':[],
-                          'model_instance_prediction': []}
+    chilli_results = {'features': features,
+                      'instance_indices': [],
+                      'instance_data': [],
+                      'exp_instance_prediction':[],
+                      'explanations':[],
+                      'perturbations': [],
+                      'model_perturbation_predictions':[],
+                      'exp_perturbation_predictions':[],
+                      'model_instance_prediction': []}
+    lime_results = {'features': features,
+                    'instance_indices': [],
+                    'instance_data': [],
+                    'exp_instance_prediction':[],
+                    'explanations':[],
+                    'perturbations': [],
+                    'model_perturbation_predictions':[],
+                    'exp_perturbation_predictions':[],
+                    'model_instance_prediction': []}
+    masala_results = {'features': features,
+                      'instance_indices': [],
+                      'instance_data': [],
+                      'exp_instance_prediction':[],
+                      'explanations':[],
+                      'model_instance_prediction': [],
+                      'local_errors': []}
 
-        model_instance_predictions = [y_test_pred[instance] for instance in instances]
+    model_instance_predictions = [y_test_pred[instance] for instance in instances]
 
-        print(instances)
-        for instance in tqdm(instances):
+    for instance in tqdm(instances):
 
 #            kw_lime_results = []
 #            kw_chilli_results = []
 #            try:
-            print(f'\n ################# Instance  = {instance} ###################')
-            # ------ BASE MODEL ------
-            print(f'Ground Truth: {y_test[instance]}')
-            print(f'Model Prediction: {y_test_pred[instance]}')
-            print(f'Instance: {x_test[instance]}')
+        print(f'\n \n ################# Instance  = {instance} ###################')
+        # ------ BASE MODEL ------
+        print(f'Ground Truth: {y_test[instance]}')
+        print(f'Model Prediction: {y_test_pred[instance]}')
 
 
-            # ---- LIME EXPLANATION -------
-            if args.lime:
+        # ---- LIME EXPLANATION -------
+        if args.lime:
 
-                print('\n ----- LIME EXPLANATION -----')
+            print('\n ----- LIME EXPLANATION -----')
 
-                lime_exp, lime_perturbations, model_perturbation_predictions, exp_perturbation_predictions, model_instance_prediction, exp_instance_prediction = LIMEExplainer.make_explanation(model, instance=instance, num_samples=1000)
+            lime_exp, lime_perturbations, model_perturbation_predictions, exp_perturbation_predictions, model_instance_prediction, exp_instance_prediction = LIMEExplainer.make_explanation(model, instance=instance, num_samples=1000)
 #                LIMEExplainer.interactive_perturbation_plot(instance, lime_exp, kernel_width, lime_perturbations, model_perturbation_predictions, exp_perturbation_predictions)
 
-                if args.plots:
-                    LIMEExplainer.plot_perturbations(instance, lime_exp, kernel_width, lime_perturbations, model_perturbation_predictions, exp_perturbation_predictions)
+            if args.plots:
+                LIMEExplainer.plot_perturbations(instance, lime_exp, kernel_width, lime_perturbations, model_perturbation_predictions, exp_perturbation_predictions)
 #                    kw_lime_results.append([lime_exp, lime_perturbations, model_perturbation_predictions, exp_perturbation_predictions])
 
 #            print(f'LIME Attr %: {lime_attr_per}')
-                print(f'LIME Prediction: {exp_instance_prediction}')
-                print(f'LIME Instance Error: {abs(model_instance_prediction-exp_instance_prediction)}')
-                print(f'LIME Local Error: {mean_absolute_error(model_perturbation_predictions, exp_perturbation_predictions)}')
+            print(f'LIME Prediction: {exp_instance_prediction}')
+            print(f'LIME Instance Error: {abs(model_instance_prediction-exp_instance_prediction)}')
+            print(f'LIME Local Error: {mean_absolute_error(model_perturbation_predictions, exp_perturbation_predictions)}')
 
 #            lime_results['Attr_%s'].append(lime_attr_per)
-                lime_results['instance_indices'].append(instance)
-                lime_results['instance_data'].append(x_test[instance])
-                lime_results['exp_instance_prediction'].append(exp_instance_prediction)
-                lime_results['model_instance_prediction'].append(model_instance_prediction)
-                lime_results['explanations'].append(lime_exp)
-                lime_results['perturbations'].append(lime_perturbations)
-                lime_results['model_perturbation_predictions'].append(model_perturbation_predictions)
-                lime_results['exp_perturbation_predictions'].append(exp_perturbation_predictions)
+            lime_results['instance_indices'].append(instance)
+            lime_results['instance_data'].append(x_test[instance])
+            lime_results['exp_instance_prediction'].append(exp_instance_prediction)
+            lime_results['model_instance_prediction'].append(model_instance_prediction)
+            lime_results['explanations'].append(lime_exp)
+            lime_results['perturbations'].append(lime_perturbations)
+            lime_results['model_perturbation_predictions'].append(model_perturbation_predictions)
+            lime_results['exp_perturbation_predictions'].append(exp_perturbation_predictions)
 
-            # ---- CHILLI EXPLANATION -------
-            if args.chilli:
-                print('\n ----- CHILLI EXPLANATION -----')
+        # ---- CHILLI EXPLANATION -------
+        if args.chilli:
+            print('\n ----- CHILLI EXPLANATION -----')
 
-                chilli_exp, chilli_perturbations, model_perturbation_predictions, exp_perturbation_predictions, model_instance_prediction, exp_instance_prediction = CHILLIExplainer.make_explanation(model, instance=instance, num_samples=1000)
-                if args.plots:
-                    CHILLIExplainer.plot_perturbations(instance, chilli_exp, kernel_width, chilli_perturbations, model_perturbation_predictions, exp_perturbation_predictions)
+            chilli_exp, chilli_perturbations, model_perturbation_predictions, exp_perturbation_predictions, model_instance_prediction, exp_instance_prediction = CHILLIExplainer.make_explanation(model, instance=instance, num_samples=1000)
+            if args.plots:
+                CHILLIExplainer.plot_perturbations(instance, chilli_exp, kernel_width, chilli_perturbations, model_perturbation_predictions, exp_perturbation_predictions)
 #                    kw_chilli_results.append([chilli_exp, chilli_perturbations, model_perturbation_predictions, exp_perturbation_predictions])
 
-                print(f'CHILLI Prediction: {exp_instance_prediction}')
-                print(f'CHILLI Instance Error: {abs(model_instance_prediction-exp_instance_prediction)}')
-                print(f'CHILLI Local Error: {mean_absolute_error(model_perturbation_predictions, exp_perturbation_predictions)}')
+            print(f'CHILLI Prediction: {exp_instance_prediction}')
+            print(f'CHILLI Instance Error: {abs(model_instance_prediction-exp_instance_prediction)}')
+            print(f'CHILLI Local Error: {mean_absolute_error(model_perturbation_predictions, exp_perturbation_predictions)}')
 
-                chilli_results['instance_indices'].append(instance)
-                chilli_results['instance_data'].append(x_test[instance])
-                chilli_results['exp_instance_prediction'].append(exp_instance_prediction)
-                chilli_results['model_instance_prediction'].append(model_instance_prediction)
-                chilli_results['explanations'].append(chilli_exp)
-                chilli_results['perturbations'].append(chilli_perturbations)
-                chilli_results['model_perturbation_predictions'].append(model_perturbation_predictions)
-                chilli_results['exp_perturbation_predictions'].append(exp_perturbation_predictions)
+            chilli_results['instance_indices'].append(instance)
+            chilli_results['instance_data'].append(x_test[instance])
+            chilli_results['exp_instance_prediction'].append(exp_instance_prediction)
+            chilli_results['model_instance_prediction'].append(model_instance_prediction)
+            chilli_results['explanations'].append(chilli_exp)
+            chilli_results['perturbations'].append(chilli_perturbations)
+            chilli_results['model_perturbation_predictions'].append(model_perturbation_predictions)
+            chilli_results['exp_perturbation_predictions'].append(exp_perturbation_predictions)
 
 #                CHILLIExplainer.plot_perturbation_distribution(chilli_perturbations, lime_perturbations, instance)
 
-            if args.masala:
-                explanation = MASALAExplainer.explain_instance(instance=instance)
+        if args.masala:
+            if not masala_ran:
+                explanation, local_error = MASALAExplainer.explain_instance(instance=instance)
 
                 masala_results['instance_indices'].append(instance)
                 masala_results['instance_data'].append(x_test[instance])
                 masala_results['exp_instance_prediction'].append(explanation.target_exp_y)
                 masala_results['model_instance_prediction'].append(explanation.target_model_y)
                 masala_results['explanations'].append(explanation)
+                masala_results['local_errors'].append(local_error)
 
 #            except:
 #                instances.append(random.randint(0, len(x_test)))
@@ -339,16 +344,20 @@ def main():
 #        if args.plots:
 #            LIMEExplainer.compare_kw_perturbations(kernel_widths, kw_lime_results, instance)
 #            CHILLIExplainer.compare_kw_perturbations(kernel_widths, kw_chilli_results, instance)
-        if args.results:
-            if args.lime:
-                with open(f'saved/results/{dataset}/LIME_{dataset}_{args.model_type}#_{args.e_id}_{args.num_instances}_kw={kernel_width}.pck', 'wb') as f:
-                    pck.dump(lime_results, f)
-            if args.chilli:
-                with open(f'saved/results/{dataset}/CHILLI_{dataset}_{args.model_type}#_{args.e_id}_{args.num_instances}_kw={kernel_width}.pck', 'wb') as f:
-                    pck.dump(chilli_results, f)
-            if args.masala:
-                with open(f'saved/results/{dataset}/MASALA_{dataset}_{args.model_type}#_{args.e_id}_{args.num_instances}.pck', 'wb') as f:
-                    pck.dump(masala_results, f)
+    print('MASALA Average Error: ', np.mean(masala_results['local_errors']))
+
+    if args.masala:
+        masala_ran = True
+    if args.results:
+        if args.lime:
+            with open(f'saved/results/{dataset}/LIME_{dataset}_{args.model_type}#_{args.e_id}_{args.num_instances}_kw={kernel_width}.pck', 'wb') as f:
+                pck.dump(lime_results, f)
+        if args.chilli:
+            with open(f'saved/results/{dataset}/CHILLI_{dataset}_{args.model_type}#_{args.e_id}_{args.num_instances}_kw={kernel_width}.pck', 'wb') as f:
+                pck.dump(chilli_results, f)
+        if args.masala:
+            with open(f'saved/results/{dataset}/MASALA_{dataset}_{args.model_type}#_{args.e_id}_{args.num_instances}.pck', 'wb') as f:
+                pck.dump(masala_results, f)
 
 
 if __name__ == '__main__':

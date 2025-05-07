@@ -183,7 +183,7 @@ class CHILLI():
 
                 # Add feature name as title for the top row
                 if i == 0:
-                    ax.set_title('Heathrow \n'+f'{self.features[f].split(' ')[-1]}')
+                    ax.set_title(f'Heathrow \n {self.features[f].split(" ")[-1]}', fontsize=8)
         fig.legend(['CHILLI', 'LIME', 'Training Data', 'Instance'], loc='upper center', ncol=4, fontsize=8, bbox_to_anchor=(0.5, 1.05))
         fig.savefig(f'{self.dataset}/Figures/Explanations/instance_{instance_idx}_perturbation_distribution.png', dpi=300, bbox_inches='tight')
 

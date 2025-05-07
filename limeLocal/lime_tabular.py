@@ -658,24 +658,10 @@ class LimeTabularExplainer(object):
         perturbedData = [instance]
 
 
-        profiler = profile.Profile()
-        profiler.enable()
-
         distances = combinedFeatureDistances(calcAllDistances(instance, x_test, features))
-
-#        for i in range(len(features)):
-#            xdata = x_test[:, i]
-#            LLR = LocalLinearRegression(xdata,y_pred, dist_function='Euclidean')
-#            w1, w2, w, MSE = LLR.calculateLocalModels()
-#            print('Calculating Distances')
-##
-#            distance_weights = [0,1,0]
-#            D, xDs= LLR.compute_distance_matrix(w, MSE, distance_weights=distance_weights, instance=instance_num)
 
         # Reduce the range of the training data set to only include the same clusters as the instance. But all points should be points which satisfy all of the clusters.
         weights = [self.kernel_fn(d) for d in distances]
-#            weights = D
-#            weights = [d for d in distances]
 
         # Define some information needed for later:
         dict_x_test = {} # Seperate training data into lists of feature data
@@ -727,10 +713,6 @@ class LimeTabularExplainer(object):
 
             # Once all features have been perturbed, add the perturbation to the list of perturbations.
             perturbedData.append(perturbation)
-
-        profiler.disable()
-#        stats = pstats.Stats(profiler).sort_stats('cumulative')
-#        stats.print_stats()
 
         return perturbedData
 

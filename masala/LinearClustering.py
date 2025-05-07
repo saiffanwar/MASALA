@@ -58,7 +58,7 @@ class LinearClustering():
         self.sparsity_threshold = sparsity_threshold
 #        self.similarity_threshold = similarity_threshold
         self.coverage_threshold = coverage_threshold
-        self.gaps_threshold = sparsity_threshold
+        self.gaps_threshold = 0.1
 #        self.gaps_threshold=0.1
         self.dataset = dataset
         self.super_cluster = super_cluster
@@ -144,6 +144,9 @@ class LinearClustering():
 
         new_clustering_cost = None
 #        init_clusters = True
+#        if K == 1:
+#            recluster = False
+#        else:
         recluster = True
 #        self.gaps = self.find_gaps(self.x)
         print(f'Clustering {self.feature_name} with K={K} clusters.')
@@ -176,17 +179,21 @@ class LinearClustering():
                 old_clustering_cost = clustering_cost
                 # Recluster the data to find the optimal clustering.
 
+
                 if recluster == True:
                     for c_num in tqdm(range(K)):
                         print('Iteration Details: ', iter, c_num, K)
                         lowest_cost_medoid = medoids[c_num]
                         lowest_cost = clustering_cost
                         cluster = clustered_data[c_num]
-                        for med in cluster:
+                        possible_medoids = random.sample(cluster,1)
+                        print('Possible Medoids: ', possible_medoids)
+                        for med in possible_medoids:
                             new_medoids = deepcopy(medoids)
                             new_medoids[c_num] = med
                             new_clustered_data = self.gen_clustering(new_medoids)
                             _,new_linear_params, new_clustering_cost = self.calc_cluster_models(self.x, self.y, new_clustered_data)
+                            print(f'New: {new_clustering_cost} < {clustering_cost} = Old')
                             if new_clustering_cost < lowest_cost:
                                 lowest_cost = new_clustering_cost
                                 lowest_cost_medoid = med
@@ -312,7 +319,9 @@ class LinearClustering():
         clustered_data = self.order_clusters(clustered_data)
 
         ''' Check if there are large gaps within the clusters data.'''
-        if len(clustered_data) != 1:
+        check_cluster_gaps = True
+        if check_cluster_gaps == True:
+            if len(clustered_data) != 1:
 #            pre_clustered_data = deepcopy(clustered_data)
 #            clustered_data = self.check_cluster_gaps(clustered_data)
 #            # Check if satisfying this constraint has changed the clustering.
@@ -320,11 +329,11 @@ class LinearClustering():
 #                changes.append(True)
 #            else:
 #                changes.append(False)
-            bad_cluster = True
-            while bad_cluster != None:
-                bad_cluster, dividing_point, clustered_data = self.remove_gaps(clustered_data)
-                if bad_cluster != None:
-                    clustered_data = self.split_cluster(bad_cluster, dividing_point, clustered_data)
+                bad_cluster = True
+                while bad_cluster != None:
+                    bad_cluster, dividing_point, clustered_data = self.remove_gaps(clustered_data)
+                    if bad_cluster != None:
+                        clustered_data = self.split_cluster(bad_cluster, dividing_point, clustered_data)
 #                    sparse_clusters, _ = self.check_cluster_sparsity(clustered_data)
 #                    if sparse_clsuter == bad_cluster:
 #                        continue

@@ -22,10 +22,11 @@ from mpl_toolkits import mplot3d
 from .explanation import Explanation
 from .LocalLinearRegression import LocalLinearRegression
 from .LinearClustering import LinearClustering
+from .perturbation_generator import smotePerturbations
 
 class LLCExplanation():
 
-    def __init__(self, model, x_test, y_pred, features, discrete_features, dataset, sparsity_threshold=0.5, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.5, preload_explainer=True, experiment_id=1):
+    def __init__(self, model, model_type, x_test, y_pred, features, discrete_features, dataset, sparsity_threshold=0.5, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.5, preload_explainer=True, experiment_id=1):
         self.model = model
         self.features = features
         self.dataset = dataset
@@ -39,6 +40,7 @@ class LLCExplanation():
         self.ploting=False
         self.discrete_features = discrete_features
         self.experiment_id = experiment_id
+        self.model_type = model_type
 
         self.gather_ensembles()
 
@@ -47,11 +49,11 @@ class LLCExplanation():
         self.feature_ensembles = {feature: [] for feature in self.features}
 
         for feature in self.features:
-            try:
-                with open(f'saved/feature_ensembles/{self.dataset}/{feature}/{self.experiment_id}_{self.coverage_threshold}_{self.neighbourhood_threshold}.pck', 'rb') as file:
+#            try:
+                with open(f'saved/feature_ensembles/{self.dataset}/{self.model_type}/{feature}/{self.experiment_id}_{self.coverage_threshold}_{self.neighbourhood_threshold}.pck', 'rb') as file:
                     self.feature_ensembles[feature] = pck.load(file)
-            except:
-                raise FileNotFoundError(f'No clustering found for {feature} in {self.dataset} with coverage {self.coverage_threshold} and neighbourhood {self.neighbourhood_threshold}.')
+#            except:
+#                raise FileNotFoundError(f'No clustering found for {feature} in {self.dataset} with coverage {self.coverage_threshold} and neighbourhood {self.neighbourhood_threshold}.')
 
 
     def generate_cluster_ranges(self, ):
@@ -98,7 +100,6 @@ class LLCExplanation():
 
     def find_cluster_matches(self, data_instance, cluster_ranges, instance_assignments, match_tolerance=0):
         match_threshold = len(self.features) - match_tolerance
-        print('\n')
         cluster_matches = []
         local_x, local_model_y = [], []
         matched_instances = []
@@ -121,7 +122,7 @@ class LLCExplanation():
         return cluster_matches, local_x, local_model_y, matched_instances
 
 
-    def generate_explanation(self, data_instance, target_idx):
+    def generate_explanation(self, data_instance, target_idx, perturbations=False):
 
         explanation = Explanation()
         explanation.target_idx = target_idx
@@ -140,15 +141,28 @@ class LLCExplanation():
 
         explanation.local_x_weights = [1 for x in explanation.local_x]
         explanation.exp_model = LinearRegression()
-        explanation.exp_model.fit(explanation.local_x, explanation.local_model_y, sample_weight=explanation.local_x_weights)
+        if perturbations:
+            perturbations_x = smotePerturbations(self.x_test, self.y_pred, self.features, data_instance, target_idx, num_samples=200)
+            perturabtions_y = self.model(perturbations_x)
+
+            explanation.exp_model.fit(perturbations_x, perturabtions_y)
+            perturbations_exp_y = explanation.exp_model.predict(perturbations_x)
+        else:
+            explanation.exp_model.fit(explanation.local_x, explanation.local_model_y, sample_weight=explanation.local_x_weights)
+
         explanation.local_exp_y = explanation.exp_model.predict(explanation.local_x)
+
+        if perturbations:
+            local_error = mean_squared_error(perturabtions_y, perturbations_exp_y)
+        else:
+            local_error = mean_squared_error(explanation.local_model_y, explanation.local_exp_y)
         explanation.target_exp_y = explanation.exp_model.predict([data_instance])[0]
 #        print(f'Ground Truth: {ground_truth}')
 #        print(f'Model Prediction: { instance_prediction }')
         print(f'LLC Explanation prediction: { explanation.target_exp_y }')
 
 #        fig = self.plot_data(plotting_data)
-        return explanation
+        return explanation, local_error
 
 #    def evaluate_explanation(self, explanation):
 #        ''' This function measures the robustness of an explanation by adding noise to different features to monitor
