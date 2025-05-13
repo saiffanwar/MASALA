@@ -120,6 +120,8 @@ def main(dataset=None, model_type=None):
 
     if args.masala:
         MASALAExplainer = masala.MASALA(base_model.model, model_type, base_model.x_test, base_model.y_test, base_model.y_test_pred, dataset, base_model.features, base_model.target_feature, base_model.discrete_features, sparsity_threshold=0.02, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.05, preload_clustering=args.load_masala_clustering)
+        if not args.load_masala_clustering:
+            MASALAExplainer.run_clustering()
 
 
     chilli_results = {'features': base_model.features,

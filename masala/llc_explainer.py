@@ -50,7 +50,7 @@ class LLCExplanation():
 
         for feature in self.features:
 #            try:
-                with open(f'saved/feature_ensembles/{self.dataset}/{self.model_type}/{feature}/{self.experiment_id}_{self.coverage_threshold}_{self.neighbourhood_threshold}.pck', 'rb') as file:
+                with open(f'saved/feature_ensembles/{self.dataset}/{self.model_type}/{feature}/{self.experiment_id}_{self.sparsity_threshold}_{self.starting_k}.pck', 'rb') as file:
                     self.feature_ensembles[feature] = pck.load(file)
 #            except:
 #                raise FileNotFoundError(f'No clustering found for {feature} in {self.dataset} with coverage {self.coverage_threshold} and neighbourhood {self.neighbourhood_threshold}.')
@@ -147,10 +147,12 @@ class LLCExplanation():
 
             explanation.exp_model.fit(perturbations_x, perturabtions_y)
             perturbations_exp_y = explanation.exp_model.predict(perturbations_x)
+            explanation.local_x = np.array(perturbations_x)
+            explanation.local_model_y = perturabtions_y
+            explanation.local_exp_y = perturbations_exp_y
         else:
             explanation.exp_model.fit(explanation.local_x, explanation.local_model_y, sample_weight=explanation.local_x_weights)
-
-        explanation.local_exp_y = explanation.exp_model.predict(explanation.local_x)
+            explanation.local_exp_y = explanation.exp_model.predict(explanation.local_x)
 
         if perturbations:
             local_error = mean_squared_error(perturabtions_y, perturbations_exp_y)

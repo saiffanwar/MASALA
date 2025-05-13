@@ -62,7 +62,7 @@ The following options are included for the methods:
 
 `--chilli_exp CHILLI_EXP  Whether to generate CHILLI explanations`
 
-`--llc_exp LLC_EXP     Whether to generate LLC explanations -kw KERNEL_WIDTH, `
+`--llc_exp LLC_EXP     Whether to generate LLC explanations `
 
 `--kernel_width KERNEL_WIDTH        The kernel width to use for the explanations `
 
@@ -71,4 +71,12 @@ The following options are included for the methods:
 `--no-results`
 
 
+
+### Visualisation App
+
+You can use the included [Dash](https://dash.plotly.com/) App that allows visualisation of explanations, clusterings and test data.
+
+![App Clsutering](/Users/saifanwar/PhD/MASALA/Figures/App Clustering.png)
+
+![App Explanation.png](/Users/saifanwar/PhD/MASALA/Figures/App Explanation.png)
 

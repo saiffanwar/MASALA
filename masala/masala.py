@@ -25,23 +25,26 @@ class MASALA:
         self.coverage_threshold = coverage_threshold
         self.starting_k = starting_k
         self.neighbourhood_threshold = neighbourhood_threshold
-        self.feature_ensemble = None
         self.explanation_generator = None
         self.experiment_id = 1
         self.num_workers = num_workers
 
-        self.run_clustering(preload_clustering=preload_clustering)
+        if preload_clustering:
+            self.initialise_explainer()
 
 
-    def run_clustering(self, preload_clustering):
-        self.clustering_generator = LLCGenerator(model=self.model, model_type=self.model_type, x_test=self.x_test, y_pred=self.y_pred, features=self.features, target_name=self.target_feature, discrete_features=self.discrete_features, dataset=self.dataset, sparsity_threshold=self.sparsity_threshold, coverage_threshold=self.coverage_threshold, starting_k=self.starting_k, neighbourhood_threshold=self.neighbourhood_threshold, preload_clustering=preload_clustering, experiment_id=self.experiment_id, num_workers=self.num_workers)
+
+    def run_clustering(self, ):
+        self.clustering_generator = LLCGenerator(model=self.model, model_type=self.model_type, x_test=self.x_test, y_pred=self.y_pred, features=self.features, target_name=self.target_feature, discrete_features=self.discrete_features, dataset=self.dataset, sparsity_threshold=self.sparsity_threshold, coverage_threshold=self.coverage_threshold, starting_k=self.starting_k, neighbourhood_threshold=self.neighbourhood_threshold, experiment_id=self.experiment_id, num_workers=self.num_workers)
+        self.feature_ensembles = self.clustering_generator.feature_ensembles
 
 #        self.clustering_generator.matplot_all_clustering()
 
+    def initialise_explainer(self,):
+        self.explanation_generator = LLCExplanation(model=self.model, model_type=self.model_type, x_test=self.x_test, y_pred=self.y_pred, dataset=self.dataset, features=self.features, discrete_features=self.discrete_features, sparsity_threshold=self.sparsity_threshold, coverage_threshold=self.coverage_threshold, starting_k=self.starting_k, neighbourhood_threshold=self.neighbourhood_threshold)
+        self.feature_ensembles = self.explanation_generator.feature_ensembles
 
-    def explain_instance(self, instance, plotting=True):
-        if self.explanation_generator is None:
-            self.explanation_generator = LLCExplanation(model=self.model, model_type=self.model_type, x_test=self.x_test, y_pred=self.y_pred, dataset=self.dataset, features=self.features, discrete_features=self.discrete_features, sparsity_threshold=self.sparsity_threshold, coverage_threshold=self.coverage_threshold, starting_k=self.starting_k, neighbourhood_threshold=self.neighbourhood_threshold)
+    def explain_instance(self, instance,):
         explanation, perturbation_error = self.explanation_generator.generate_explanation(self.x_test[instance], instance)
 #        if plotting:
 #            self.explanation_generator.interactive_exp_plot(explanation)
@@ -147,7 +150,7 @@ class MASALA:
 
 
         for feature in features_to_plot:
-            value = self.clustering_generator.feature_ensembles[feature]
+            value = self.feature_ensembles[feature]
             feature_index = self.features.index(feature)
             i = features_to_plot.index(feature)
             clustered_data, linear_params = value

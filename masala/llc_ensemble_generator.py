@@ -25,7 +25,7 @@ from .LocalLinearRegression import LocalLinearRegression
 
 class LLCGenerator():
 
-    def __init__(self, model, model_type, x_test, y_pred, features, target_name, discrete_features, dataset, sparsity_threshold=0.5, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.5, preload_clustering=True, experiment_id=1, num_workers=1):
+    def __init__(self, model, model_type, x_test, y_pred, features, target_name, discrete_features, dataset, sparsity_threshold=0.5, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.5, experiment_id=1, num_workers=1):
         self.model = model
         self.model_type = model_type
         self.features = features
@@ -42,23 +42,17 @@ class LLCGenerator():
         self.experiment_id = experiment_id
         self.num_workers = num_workers
 
-        self.gather_ensembles(preload_clustering)
+        self.generate_ensembles()
 
 
-    def gather_ensembles(self, preload_clustering=True):
+    def generate_ensembles(self, preload_clustering=True):
 
-        if preload_clustering == True:
-#            try:
-                self.feature_ensembles = {feature: [] for feature in self.features}
-
-                for feature in self.features:
-                    with open(f'saved/feature_ensembles/{self.dataset}/{self.model_type}/{feature}/{self.experiment_id}_{self.coverage_threshold}_{self.neighbourhood_threshold}.pck', 'rb') as file:
-                        self.feature_ensembles[feature] = pck.load(file)
-#            except:
-#                raise FileNotFoundError(f'No preloaded clustering found for {self.dataset} dataset.')
-        else:
             self.multiworker_clustering(num_workers=self.num_workers)
-            self.gather_ensembles(preload_clustering=True)
+            self.feature_ensembles = {feature: [] for feature in self.features}
+
+            for feature in self.features:
+                with open(f'saved/feature_ensembles/{self.dataset}/{self.model_type}/{feature}/{self.experiment_id}_{self.sparsity_threshold}_{self.starting_k}.pck', 'rb') as file:
+                    self.feature_ensembles[feature] = pck.load(file)
 
 
     def feature_space_clustering(self, feature_xs):
@@ -183,7 +177,7 @@ class LLCGenerator():
         else:
             os.makedirs(f'saved/feature_ensembles/{self.dataset}/{self.model_type}/{self.features[i]}')
 
-        with open(f'saved/feature_ensembles/{self.dataset}/{self.model_type}/{self.features[i]}/{self.experiment_id}_{self.coverage_threshold}_{self.neighbourhood_threshold}.pck', 'wb') as file:
+        with open(f'saved/feature_ensembles/{self.dataset}/{self.model_type}/{self.features[i]}/{self.experiment_id}_{self.sparsity_threshold}_{self.starting_k}.pck', 'wb') as file:
             pck.dump(feature_ensembles, file)
 #            if i == len(features)-1:
 

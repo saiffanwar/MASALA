@@ -267,8 +267,8 @@ def varying_interpretability(kernel_widths):
                 if min(instance_fidelities) < min_if:
                     min_if = min(instance_fidelities)
 
-            for method in ['MASALA']:
-                with open(f'saved/results/{args.dataset}/{method}_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}.pck', 'rb') as file:
+            method = 'MASALA'
+            with open(f'saved/results/{args.dataset}/{method}_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}.pck', 'rb') as file:
                 masala_result = pck.load(file)
 
             for n in range(len(masala_result['explanations'])):
@@ -312,10 +312,10 @@ def varying_interpretability(kernel_widths):
 
 for dataset in ['MIDAS', 'housing', 'webTRIS']:
     args.dataset = dataset
-#    fidelities()
+    fidelities()
 #    masala_fidelities()
 #    exp_variance_box_plot()
-    varying_interpretability(kernel_widths[:5])
+#    varying_interpretability(kernel_widths[:5])
 
 
 

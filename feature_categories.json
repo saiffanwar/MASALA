@@ -20,10 +20,10 @@
     "0 - 520 cm",
     "521 - 660 cm",
     "661 - 1160 cm",
-    "Average Speed (mph)"
+    "Average Speed (mph)",
+    "Date"
   ],
   "cyclicFeatures": [
-    "Date",
     "Heathrow Wind Direction",
     "Day of Week",
     "Time Interval"
