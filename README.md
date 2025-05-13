@@ -76,7 +76,7 @@ The following options are included for the methods:
 
 You can use the included [Dash](https://dash.plotly.com/) App that allows visualisation of explanations, clusterings and test data.
 
-![App Clsutering](/Users/saifanwar/PhD/MASALA/Figures/App Clustering.png)
+![App Clsutering](Figures/App Clustering.png)
 
-![App Explanation.png](/Users/saifanwar/PhD/MASALA/Figures/App Explanation.png)
+![App Explanation.png](Figures/App Explanation.png)
 
