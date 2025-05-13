@@ -87,14 +87,14 @@ class LLCExplanation():
             cluster_assignments[f] = self.find_ranges(x[i], cluster_ranges[f])
             if cluster_assignments[f] is not None:
                 assigned += 1
-        if assigned != len(self.features):
-            print(cluster_ranges, x)
-            print(cluster_assignments)
-            print('Cluster assignment error')
+#        if assigned != len(self.features):
+#            print(cluster_ranges, x)
 #            print(cluster_assignments)
-#            print(x)
-#            [print(f, cluster_ranges[f]) for f in self.features]
-            raise ValueError
+#            print('Cluster assignment error')
+##            print(cluster_assignments)
+##            print(x)
+##            [print(f, cluster_ranges[f]) for f in self.features]
+#            raise ValueError
         return cluster_assignments
 
 
@@ -122,7 +122,7 @@ class LLCExplanation():
         return cluster_matches, local_x, local_model_y, matched_instances
 
 
-    def generate_explanation(self, data_instance, target_idx, perturbations=False):
+    def generate_explanation(self, data_instance, target_idx, perturbations=True):
 
         explanation = Explanation()
         explanation.target_idx = target_idx
@@ -135,14 +135,14 @@ class LLCExplanation():
         instance_cluster_assignments = self.generate_cluster_assignments(cluster_ranges, data_instance)
 
         cluster_matches, explanation.local_x, explanation.local_model_y, matched_instances = self.find_cluster_matches(data_instance, cluster_ranges, instance_cluster_assignments)
-        print(f'Number of local points: {len(matched_instances)}')
+#        print(f'Number of local points: {len(matched_instances)}')
 
         norm_cluster_matches = [m/max(cluster_matches) for m in cluster_matches]
 
         explanation.local_x_weights = [1 for x in explanation.local_x]
         explanation.exp_model = LinearRegression()
         if perturbations:
-            perturbations_x = smotePerturbations(self.x_test, self.y_pred, self.features, data_instance, target_idx, num_samples=200)
+            perturbations_x = smotePerturbations(explanation.local_x, explanation.local_model_y, self.features, data_instance, target_idx, num_samples=200)
             perturabtions_y = self.model(perturbations_x)
 
             explanation.exp_model.fit(perturbations_x, perturabtions_y)

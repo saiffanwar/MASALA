@@ -10,7 +10,6 @@ class DataProcessing:
     '''
     def __init__(self, siteName = None):
         self.daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        self.independants = ['Ordinal Date','Time Interval', 'Bank Holiday', 'Weekend', '0 - 520 cm', '521  - 660 cm', '661 - 1160 cm', '1160+ cm', 'Avg mph', 'Letters in Day', 'Monday']
         self.siteName = siteName
 
     def boolToInt(self, bool):

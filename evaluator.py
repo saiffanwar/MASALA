@@ -41,6 +41,7 @@ chilli_color = '#dc0000'
 chilli_color_2 = '#e77070'
 lime_color = '#10a500'
 lime_color_2 = '#84bc7e'
+masala_color = '#0345fc'
 
 if args.kernel_width == None:
 #    kernel_widths = [0.05, 0.1, 0.25, 0.5, 0.75, 1.0]
@@ -48,22 +49,19 @@ if args.kernel_width == None:
 else:
     kernel_widths = [args.kernel_width]
 #kernel_widths = [kernel_widths]
-if args.dataset == 'MIDAS':
-    models = ['GBR', 'SVR', 'RNN']
-elif args.dataset == 'housing':
-    models = ['GBR', 'SVR', 'RF']
-elif args.dataset == 'PHM08':
-    models = ['GBR', 'SVR', 'RF']
-elif args.dataset == 'webTRIS':
-    models = ['SVR', 'RNN', 'GBR']
+
+models = { 'MIDAS': ['GBR', 'SVR', 'RNN'],
+          'housing': ['GBR', 'SVR', 'RF'],
+          'PHM08': ['GBR', 'SVR', 'RF'],
+          'webTRIS': ['SVR', 'RF', 'GBR']}
 
 def fidelities():
 
-    fig, ax = plt.subplots(1, len(models), figsize = (8, 2), sharey=True)
+    fig, ax = plt.subplots(1, len(models[args.dataset]), figsize = (8, 2), sharey=True)
 
-    table_results = {kw: {model: {'LIME': {'local_fidelity': None, 'instance_fidelity': None}, 'CHILLI': {'local_fidelity': None, 'instance_fidelity': None}} for model in models} for kw in kernel_widths}
+    table_results = {kw: {model: {'LIME': {'local_fidelity': None, 'instance_fidelity': None}, 'CHILLI': {'local_fidelity': None, 'instance_fidelity': None}} for model in models[args.dataset]} for kw in kernel_widths}
 
-    for m, model in enumerate(models):
+    for m, model in enumerate(models[args.dataset]):
         lime_local_fidelity = []
         lime_instance_fidelity = []
         chilli_local_fidelity = []
@@ -77,7 +75,6 @@ def fidelities():
 
                 print(f'\n --------- {method} Results --------')
                 print(result['instance_indices'])
-                br
                 # Local Fidelity
                 local_fidelity_scores = []
                 for n in range(len(result['model_perturbation_predictions'])):
@@ -112,6 +109,9 @@ def fidelities():
 
                 print(f'Instance Fidelity: {avg_instance_fidelity}')
 
+        masala_local_fidelity, masala_instance_fidelity = masala_fidelities(model, args.dataset)
+        ax[m].plot(kernel_widths, [masala_local_fidelity]*len(kernel_widths), label='MASALA', color=masala_color, linestyle='--')
+        ax[m].plot(kernel_widths, [masala_instance_fidelity]*len(kernel_widths), label='MASALA', color=masala_color)
         ax[m].plot(kernel_widths, lime_local_fidelity, label='LIME', color=lime_color, linestyle='--')
         ax[m].plot(kernel_widths, chilli_local_fidelity, label='CHILLI', color=chilli_color, linestyle='--')
         ax[m].set_title(f'{model} - {cleaned_dataset_names[args.dataset]}')
@@ -130,8 +130,20 @@ def fidelities():
     fig.legend(['LIME - Local', 'CHILLI - Local', 'LIME - Instance', 'CHILLI - Instance'], loc='upper center', ncols=2, bbox_to_anchor=(0.5, 1.30))
     fig.savefig(f'Figures/{args.dataset}_fidelities.pdf', bbox_inches='tight')
 
-def masala_fidelities():
-    for
+def masala_fidelities(model, dataset):
+    with open(f'saved/results/{args.dataset}/MASALA_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}.pck', 'rb') as file:
+        result = pck.load(file)
+    print(f'\n --------- MASALA Results: {args.dataset} {model} --------')
+    instance_errors = [abs(result['model_instance_prediction'][i] - result['exp_instance_prediction'][i]) for i in range(len(result['model_instance_prediction']))]
+    instance_fidelity = np.mean(instance_errors)
+    print(f'Instance Fidelity: {instance_fidelity}')
+    local_fidelity = np.mean(result['local_errors'])
+    print(f'Local Fidelity: {local_fidelity}')
+    return local_fidelity, instance_fidelity
+
+
+
+
 
 def print_tex_table(table_results):
     for kw in table_results.keys():
@@ -143,8 +155,8 @@ def print_tex_table(table_results):
 
 
 def exp_variance_box_plot():
-    fig2, ax2 = plt.subplots(1, len(models), figsize=(9, 2.5))
-    for m, model in enumerate(models):
+    fig2, ax2 = plt.subplots(1, len(models[args.dataset]), figsize=(9, 2.5))
+    for m, model in enumerate(models[args.dataset]):
         fig, ax = plt.subplots(2, len(kernel_widths), figsize=(20, 10 ))
         max_val = -np.inf
         variances = [[], []]
@@ -200,7 +212,7 @@ def predict_with_top_k_features(explanation, local_model, instance_data, k):
 
 def varying_interpretability(kernel_widths):
 
-    for m, model in enumerate(models):
+    for m, model in enumerate(models[args.dataset]):
         max_if = -np.inf
         min_if = np.inf
         max_lf = -np.inf
@@ -211,7 +223,10 @@ def varying_interpretability(kernel_widths):
             result_dict = {'LIME': {'local_fidelity': {k: [] for k in range(len(features[args.dataset]))},
                                     'instance_fidelity': {k: [] for k in range(len(features[args.dataset]))}},
                             'CHILLI': {'local_fidelity': {k: [] for k in range(len(features[args.dataset]))},
-                                    'instance_fidelity': {k: [] for k in range(len(features[args.dataset]))}}}
+                                    'instance_fidelity': {k: [] for k in range(len(features[args.dataset]))}},
+                            'MASALA': {'local_fidelity': [],
+                                       'instance_fidelity': []}
+                           }
             chilli_local_fidelity = {k: [] for k in range(len(features[args.dataset]))}
             chilli_instance_fidelity = {k: [] for k in range(len(features[args.dataset]))}
             lime_local_fidelity = {k: [] for k in range(len(features[args.dataset]))}
@@ -236,6 +251,7 @@ def varying_interpretability(kernel_widths):
                             top_k_perturbation_predictions.append(predict_with_top_k_features(sorted_exp, local_model, result['perturbations'][n][p], k))
                         result_dict[method]['local_fidelity'][k].append(calculate_local_fidelity(top_k_perturbation_predictions, result['model_perturbation_predictions'][n]))
 
+
             for method, color in zip(['LIME', 'CHILLI'], [lime_color, chilli_color]):
                 local_fidelities = [np.mean(result_dict[method]['local_fidelity'][k]) for k in range(len(features[args.dataset]))]
                 instance_fidelities = [np.mean(result_dict[method]['instance_fidelity'][k]) for k in range(len(features[args.dataset]))]
@@ -251,6 +267,28 @@ def varying_interpretability(kernel_widths):
                 if min(instance_fidelities) < min_if:
                     min_if = min(instance_fidelities)
 
+            for method in ['MASALA']:
+                with open(f'saved/results/{args.dataset}/{method}_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}.pck', 'rb') as file:
+                masala_result = pck.load(file)
+
+            for n in range(len(masala_result['explanations'])):
+                explanation = masala_result['explanations'][n]
+                instance_data = masala_result['instance_data'][n]
+                local_model = explanation.exp_model
+                # Sort instance data and exp based on l)
+                for k in range(len(features[args.dataset])):
+                    top_k_instance_prediction = predict_with_top_k_features(local_model.coef_, local_model, instance_data, k)
+                    result_dict[method]['instance_fidelity'].append(calculate_instance_fidelity(top_k_instance_prediction, masala_result['model_instance_prediction'][n]))
+
+                    top_k_perturbation_predictions = []
+                    for p in range(len(explanation.local_x)):
+                        top_k_perturbation_predictions.append(predict_with_top_k_features(local_model.coef_, local_model, explanation.local_x[p], k))
+                    result_dict[method]['local_fidelity'].append(calculate_local_fidelity(top_k_perturbation_predictions, explanation.local_model_y))
+
+            local_fidelities = [np.mean(result_dict[method]['local_fidelity']) for k in range(len(features[args.dataset]))]
+            instance_fidelities = [np.mean(result_dict[method]['instance_fidelity']) for k in range(len(features[args.dataset]))]
+            axes[i].plot(local_fidelities, label=method, color=masala_color, linestyle='--')
+            axes[i].plot(instance_fidelities, label=method, color=masala_color)
 
             axes[i].set_title(r'$\sigma$ = ' + str(kernel_width))
             if i == 0:
@@ -267,24 +305,17 @@ def varying_interpretability(kernel_widths):
 
 
 #    axes[1][i].legend()
-        fig.legend(['LIME - Local', 'CHILLI - Local', 'LIME - Instance', 'CHILLI - Instance'], loc='upper center', ncols=2, bbox_to_anchor=(0.5, 1.30))
+        fig.legend(['LIME - Local', 'CHILLI - Local', 'LIME - Instance', 'CHILLI - Instance', 'MASALA - Local', 'MASALA - Instance'], loc='upper center', ncols=2, bbox_to_anchor=(0.5, 1.30))
         fig.savefig(f'Figures/{args.dataset}_{model}_interpretability.png', bbox_inches='tight', dpi=300)
 
 
 
 for dataset in ['MIDAS', 'housing', 'webTRIS']:
     args.dataset = dataset
-    if args.dataset == 'MIDAS':
-        models = ['GBR', 'SVR', 'RNN']
-    elif args.dataset == 'housing':
-        models = ['GBR', 'SVR', 'RF']
-    elif args.dataset == 'PHM08':
-        models = ['GBR', 'SVR', 'RF']
-    elif args.dataset == 'webTRIS':
-        models = ['SVR', 'RF', 'GBR']
-    fidelities()
+#    fidelities()
+#    masala_fidelities()
 #    exp_variance_box_plot()
-#    varying_interpretability(kernel_widths[:5])
+    varying_interpretability(kernel_widths[:5])
 
 
 

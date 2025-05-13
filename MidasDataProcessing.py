@@ -18,8 +18,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 class MidasDataProcessing():
 
-    def __init__(self, linearFeaturesIncluded=True):
+    def __init__(self, cleaned_feature_names, linearFeaturesIncluded=True):
         self.linearFeaturesIncluded = linearFeaturesIncluded
+        self.cleaned_feature_names = cleaned_feature_names
         if self.linearFeaturesIncluded:
             self.availableFeatures = ['ob_time', 'wind_speed', 'wind_direction', 'cld_ttl_amt_id', 'cld_base_ht_id_1', 'visibility', 'msl_pressure', 'air_temperature', 'rltv_hum']
         else:
@@ -48,8 +49,11 @@ class MidasDataProcessing():
 
         # Convert str to datetime
         df['ob_time'] = pd.to_datetime(df ['ob_time'], format='%Y-%m-%d %H:%M:%S')
-        for col in df.columns:
-            df.rename(columns={col: location+' '+col}, inplace=True)
+        for c, col in enumerate(df.columns):
+            if f'{location} {col}' in self.cleaned_feature_names.keys():
+                df.rename(columns={col: self.cleaned_feature_names[location+' '+col]}, inplace=True)
+            else:
+                df.rename(columns={col: location+' '+col}, inplace=True)
 
         return df
 
@@ -173,7 +177,6 @@ class MidasDataProcessing():
 
     def createSpatialDf(self, mainLocation='keswick'):
         temporalDf = self.fetchData(mainLocation)
-        print(temporalDf.columns)
         if self.linearFeaturesIncluded:
             spatialFeatures = ['wind_speed', 'wind_direction', 'msl_pressure', 'dewpoint', 'rltv_hum']
         else:
@@ -201,6 +204,7 @@ class MidasDataProcessing():
 
     def create_temporal_df(self, mainLocation='heathrow'):
         temporalDf = self.fetchData(mainLocation)
+        print(temporalDf.columns)
         temporalDf = self.convertDatestoYearlyFloat(mainLocation, temporalDf)
         temporalDf = self.cleanDf(temporalDf)
         self.allFeatures = temporalDf.columns

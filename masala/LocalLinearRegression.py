@@ -19,13 +19,14 @@ class LocalLinearRegression():
     which is used to calculate the neighbourhood of points to include in each points local linear regression.
     The current neighbourhood is set to 5% of the maximum distance.
     '''
-    def __init__(self, x,y, dist_function):
+    def __init__(self, x,y, dist_function, feature_name):
         self.feature_type = dist_function
         print(self.feature_type)
         self.x = x
         self.y = y
         self.N = len(x)
         self.CR = CyclicRegression(boundary=max(self.x))
+        self.feature_name = feature_name
         if dist_function == 'Linear':
             self.dist_function = self.euclideanDefine()
         elif dist_function == 'Cyclic':
@@ -66,6 +67,7 @@ class LocalLinearRegression():
         self.xDs_norm = np.array(list(map(lambda x: normalise(maxX, minX, x), self.xDs))).reshape(self.N, self.N)
 
 
+
     def calculateLocalModels(self, neighbourhood_threshold=0.05):
         ''' Calculates the local linear model for each point. First calulates the neighbourhood of a point by
         checking which points distance is less than the defined 5% neighbourhood threshold. Then performs linear regression within this neighbourhood.
@@ -80,17 +82,26 @@ class LocalLinearRegression():
 #        Calculate distances between all points so can reuse later.
         self.pointwiseDistance(self.x, self.y)
         self.neighbourhoods = []
+        self.local_xs = []
+        self.local_ys = []
+        neighbourhood_threshold = 0.5*np.std(self.xDs_norm)
         for i in tqdm(range(self.N)):
             check = [self.xDs_norm[i][j]<neighbourhood_threshold for j in range(self.N)]
             localxdata = list(compress(self.x, check))
+            self.local_xs.append(localxdata)
             localydata = list(compress(self.y, check))
+            self.local_ys.append(localydata)
 
             self.neighbourhoods.append(len(localxdata))
             if i ==0:
                 self.first_point_neighbours = [localxdata, localydata]
             X = np.array([localxdata, np.ones(len(localxdata))]).T
             if self.feature_type == 'Linear':
-                wlocal = np.linalg.lstsq(X, localydata, rcond=1)[0]
+#                wlocal = np.linalg.lstsq(X, localydata, rcond=1)[0]
+                model = LinearRegression()
+#                model.fit(self.x.reshape(-1,1), self.y, sample_weight=weights)
+                model.fit(X, localydata)
+                wlocal = [model.coef_[0], model.intercept_]
                 w1.append(wlocal[0])
                 w2.append(wlocal[1])
                 w.append(wlocal)
@@ -99,32 +110,34 @@ class LocalLinearRegression():
                 w1.append(m)
                 w2.append(c)
                 w.append([m, c])
+        inch = 0.3997
+        fig2, axes2 = plt.subplots(1,1, figsize=(18*inch, 12*inch))
+        for i in range(len(self.x)):
+            if i == 20:
+                label = 'Local Linear Regression Model'
 
-#           LLR plotting for individual points
-#            if i%10 ==0:
-#                xrange = np.linspace(min(localxdata), max(localxdata), 100)
-#                fig, axes = plt.subplots(1,1,figsize=(10,10))
-#                axes.scatter(self.x, self.y, s=3)
-#                axes.scatter(localxdata, localydata, s=5, c='red')
-#                axes.scatter(self.x[i], self.y[i], s=100, c='green')
-#                ys = [wlocal[0]*xrange[j]+wlocal[1] for j in range(100)]
-#                axes.legend(['All Data', 'Local Data', 'Selected Point', 'Local Model'])
-#                plt.plot(xrange, ys, c='green', linewidth=5)
-#                plt.savefig('Figures/LocalModels/housingLinearRegression{}.png'.format(i))
-
-#            plt.scatter(self.x, self.y, s= self.xDs_norm[i]*100)
-#            plt.show()
-#            for circular regression uncomment the following:
-
-#            preds, m, c = self.CR.cyclicRegression(localxdata, localydata)
-#
-#            w1.append(m)
-#            w2.append(c)
-#            w.append([m, c])
-#            MSE.append(mean_squared_error(localydata, preds))
+                axes2.plot(self.local_xs[i], [w1[i]*n_x + w2[i] for n_x in self.local_xs[i]], color='firebrick', linewidth=1, label=r'Local Linear Regression Model', zorder=4)
+                axes2.scatter(self.x[i], self.y[i], s=20, color='firebrick', label=r'Instance $x_i$', zorder=5)
+                axes2.scatter(self.local_xs[i], self.local_ys[i], color='lightsalmon', s=5, label=r'$N(x_i)$', zorder=3, alpha=0.5)
+            else:
+                label = '__no_legend__'
+#                axes2.plot(self.local_xs[i], [w1[i]*n_x + w2[i] for n_x in self.local_xs[i]], color='firebrick', linewidth=1, label=label)
+#            if i ==110:
+#                fig, axes = plt.subplots(1,1, figsize=(20*inch, 8*inch))
+#                axes.plot(self.local_xs[i], [w1[i]*n_x + w2[i] for n_x in self.local_xs[i]], color='red', linewidth=3)
+#                axes.scatter(self.x,self.y, s=10)
+#                axes.set_xlabel(r'$x$', fontsize=11)
+#                axes.set_ylabel(r'$\hat{y}$')
+#                fig.suptitle(r'Local Linear Regression Models', fontsize=11)
+#                fig.savefig(f'Figures/LocalLinearRegression_{i}.png', bbox_inches='tight')
+        axes2.scatter(self.x,self.y, s=5, color='lightsteelblue', label='Data Instance')
+        axes2.set_xlabel(f'Median Income  '+r'$x$', fontsize=12)
+        axes2.set_ylabel(r'Median House Value  $\hat{y}$', fontsize=12)
+#        fig2.suptitle(r'Local Linear Regression Models', fontsize=11)
+        axes2.legend(loc='upper center', fontsize=12, markerscale=1, ncol=2, bbox_to_anchor=(0.5, 1.2), fancybox=True)
+        fig2.savefig(f'Figures/LocalLinearRegression_{self.feature_name}.png', bbox_inches='tight', dpi=300)
 
         return w1, w2, w
-
 
 
     def compute_distance_matrix(self, w, distance_weights= {'x': 1, 'w': 1, 'neighbourhood': 1}, instance=None):

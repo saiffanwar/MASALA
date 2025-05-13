@@ -14,9 +14,10 @@ from sklearn.svm import SVR
 from data_manipulator import housing_data_manipulator
 
 class CaliforniaHousingModel:
-    def __init__(self, model_type, test_size=0.2, random_state=42):
+    def __init__(self, model_type, cleaned_feature_names, test_size=0.2, random_state=42):
         # Default to RandomForest if no model is passed
 #        self.model = model if model else RandomForestRegressor(random_state=random_state, n_estimators=100)
+        self.cleaned_feature_names = cleaned_feature_names
         self.model_type = model_type
         self.test_size = test_size
         self.random_state = random_state
@@ -26,16 +27,16 @@ class CaliforniaHousingModel:
     def load_data(self):
         # Load and convert to pandas DataFrame
         data = fetch_california_housing()
-        self.df = pd.DataFrame(data.data, columns=data.feature_names)
-        self.df['MedHouseVal'] = data.target
+        self.df = pd.DataFrame(data.data, columns=self.cleaned_feature_names.values())
+        self.df['Median House Value'] = data.target
 #        self.df = housing_data_manipulator(self.df)
         print(self.df.head())
         # plot data
 
     def preprocess(self):
         # Basic train-test split
-        X = self.df.drop(columns='MedHouseVal')
-        y = self.df['MedHouseVal']
+        X = self.df.drop(columns='Median House Value')
+        y = self.df['Median House Value']
 
         self.scaler = StandardScaler()
         X = self.scaler.fit_transform(np.array(X))

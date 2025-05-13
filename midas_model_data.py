@@ -240,14 +240,14 @@ def plotPredictions(features, x_test, y_test, y_pred):
 
 class MIDAS():
 
-    def __init__(self, load_model=True, model_type='RNN'):
+    def __init__(self, cleaned_feature_names, load_model=True, model_type='RNN'):
 
         self.load_model = load_model
         self.model_type = model_type
 
-        self.data = MidasDataProcessing(linearFeaturesIncluded=True)
-        cleanedFeatureNames = ['Heathrow wind speed', 'Heathrow wind direction', 'Heathrow total cloud cover', 'Heathrow cloud base height', 'Heathrow visibility', 'Heathrow MSL pressure', 'Date']
+        self.data = MidasDataProcessing(linearFeaturesIncluded=True, cleaned_feature_names=cleaned_feature_names)
         self.df = self.data.create_temporal_df(mainLocation='heathrow')
+        print(self.df.head())
 #        self.df = midas_data_manipulator(self.df)
         self.train_loader, self.val_loader, self.test_loader, self.train_loader_one, self.test_loader_one = self.data.datasplit(self.df, 'heathrow air_temperature')
 
@@ -325,8 +325,8 @@ class MIDAS():
 
         self.train_preds = np.array(train_pred).flatten()
         self.test_preds = np.array(test_pred).flatten()
-        fig = plotPredictions(self.data.trainingFeatures, self.data.X_test, values, self.test_preds)
-        fig.savefig(f'MIDAS/Figures/MIDAS_{self.model_type}_Predictions.pdf', bbox_inches='tight')
+#        fig = plotPredictions(self.data.trainingFeatures, self.data.X_test, values, self.test_preds)
+#        fig.savefig(f'MIDAS/Figures/MIDAS_{self.model_type}_Predictions.pdf', bbox_inches='tight')
         print('Training RMSE: ',mean_squared_error(self.data.y_train, self.train_preds, squared=False))
         print('Test RMSE: ',mean_squared_error(self.data.y_test, self.test_preds, squared=False))
 

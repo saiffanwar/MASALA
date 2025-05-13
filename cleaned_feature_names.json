@@ -1,0 +1,31 @@
+{
+  "MIDAS": {
+    "heathrow wind_speed": "Heathrow Wind Speed",
+    "heathrow wind_direction": "Heathrow Wind Direction",
+    "heathrow cld_ttl_amt_id": "Heathrow Cloud Total Amount ID",
+    "heathrow cld_base_ht_id_1": "Heathrow Cloud Base Height ID 1",
+    "heathrow visibility": "Heathrow Visibility",
+    "heathrow msl_pressure": "Heathrow Mean Sea Level Pressure",
+    "heathrow rltv_hum": "Heathrow Relative Humidity",
+    "heathrow prcp_amt": "Heathrow Precipitation Amount",
+    "Date": "Date"
+  },
+  "housing": {
+    "MedInc": "Median Income",
+    "HouseAge": "House Age",
+    "AveRooms": "Average Number of Rooms",
+    "AveBedrms": "Average Number of Bedrooms",
+    "Population": "Population",
+    "AveOccup": "Average Occupancy",
+    "Latitude": "Latitude",
+    "Longitude": "Longitude"
+  },
+  "webTRIS": {
+    "Time Interval": "Time Interval",
+    "0 - 520 cm": "0 - 520 cm",
+    "521  - 660 cm": "521 - 660 cm",
+    "661 - 1160 cm": "661 - 1160 cm",
+    "Day": "Day of Week",
+    "Avg mph": "Average Speed (mph)"
+  }
+}

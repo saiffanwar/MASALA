@@ -1,0 +1,31 @@
+{
+  "euclideanFeatures": [
+    "Heathrow Cloud Total Amount ID",
+    "Heathrow Cloud Base Height ID 1",
+    "Heathrow Visibility",
+    "Heathrow Mean Sea Level Pressure",
+    "Heathrow Dewpoint",
+    "Heathrow Relative Humidity",
+    "Heathrow Wind Speed",
+    "Heathrow Air Temperature",
+    "Heathrow Precipitation Amount",
+    "Median Income",
+    "House Age",
+    "Average Number of Rooms",
+    "Average Number of Bedrooms",
+    "Population",
+    "Average Occupancy",
+    "Latitude",
+    "Longitude",
+    "0 - 520 cm",
+    "521 - 660 cm",
+    "661 - 1160 cm",
+    "Average Speed (mph)"
+  ],
+  "cyclicFeatures": [
+    "Date",
+    "Heathrow Wind Direction",
+    "Day of Week",
+    "Time Interval"
+  ]
+}

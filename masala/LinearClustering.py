@@ -37,7 +37,7 @@ class LinearClustering():
     ''' This class clusters a dataset into regions of linearity. It is provided a distance matrix computed in the LocalLinearRegression class.
     This distance matrix is based on the local linear models of each point as well as the raw distance values. '''
 
-    def __init__(self, dataset, super_cluster, x, y, D, xDs, feature, K,
+    def __init__(self, dataset, super_cluster, x, y, D, xDs, feature, target_name, K,
                 sparsity_threshold,
                 coverage_threshold,
                 gaps_threshold,
@@ -50,6 +50,7 @@ class LinearClustering():
         self.D = np.array(D)
         self.xDs = xDs
         self.feature_name = feature
+        self.target_name = target_name
         self.clustering_cost = None
         self.clustered_data = None
         self.medoids = None
@@ -58,14 +59,14 @@ class LinearClustering():
         self.sparsity_threshold = sparsity_threshold
 #        self.similarity_threshold = similarity_threshold
         self.coverage_threshold = coverage_threshold
-        self.gaps_threshold = 0.1
+        self.gaps_threshold = 0.1*abs(max(self.x)-min(self.x))
 #        self.gaps_threshold=0.1
         self.dataset = dataset
         self.super_cluster = super_cluster
         self.feature_type = feature_type
         self.plotting=True
         self.experiment_id = experiment_id
-        self.plotting_dir = f'Figures/{self.dataset}/Clustering/OptimisedClusters/{self.feature_name}/{self.experiment_id}/{self.super_cluster}'
+        self.plotting_dir = f'Figures/{self.dataset}/Clustering/OptimisedClusters/{self.feature_name}'
 
         # Clear folder for figures to show evolution of clustering.
 
@@ -139,6 +140,8 @@ class LinearClustering():
 
         K = self.K
         num_iterations = 1000
+        stopping_criteria = 10
+        no_change = 0
         iter = 0
         self.colours = [np.random.rand(1,3) for i in range(K)]
 
@@ -181,19 +184,16 @@ class LinearClustering():
 
 
                 if recluster == True:
-                    for c_num in tqdm(range(K)):
-                        print('Iteration Details: ', iter, c_num, K)
+                    for c_num in range(K):
                         lowest_cost_medoid = medoids[c_num]
                         lowest_cost = clustering_cost
                         cluster = clustered_data[c_num]
                         possible_medoids = random.sample(cluster,1)
-                        print('Possible Medoids: ', possible_medoids)
                         for med in possible_medoids:
                             new_medoids = deepcopy(medoids)
                             new_medoids[c_num] = med
                             new_clustered_data = self.gen_clustering(new_medoids)
                             _,new_linear_params, new_clustering_cost = self.calc_cluster_models(self.x, self.y, new_clustered_data)
-                            print(f'New: {new_clustering_cost} < {clustering_cost} = Old')
                             if new_clustering_cost < lowest_cost:
                                 lowest_cost = new_clustering_cost
                                 lowest_cost_medoid = med
@@ -203,8 +203,11 @@ class LinearClustering():
 #                    clustered_data = self.gen_clustering(medoids)
                     _, linear_params, clustering_cost = self.calc_cluster_models(self.x, self.y, clustered_data)
                     if clustering_cost == old_clustering_cost:
-                        recluster = False
+                        no_change += 1
+                        if no_change > stopping_criteria:
+                            recluster = False
                     else:
+                        no_change = 0
                         old_clustering_cost = clustering_cost
 #                    recluster = False
 #                clustering_cost, linear_params, clustered_data, medoids, recluster = self.recluster(K, clustered_data, medoids, clustering_cost, linear_params)
@@ -219,7 +222,6 @@ class LinearClustering():
 
 
         if self.plotting:
-            print('plotting')
             fig = self.plotMedoids(clustered_data, medoids, linear_params, clustering_cost)
             fig.savefig(self.plotting_dir+f'/before_verifying_{K}.pdf', bbox_inches='tight')
 
@@ -236,7 +238,6 @@ class LinearClustering():
             fig.savefig(self.plotting_dir+f'/after_verifying_{K}_merged_to_{len(self.clustered_data)}.pdf', bbox_inches='tight')
 
         # If the number of clusters has changed, pick new medoids from the same clusters and optimise further.
-        print(f'Changes: {changes}', 'K before:', K, 'K after:', len(self.clustered_data))
         if len(self.clustered_data) < K:
             K = len(self.clustered_data)
             self.K = K
@@ -347,15 +348,21 @@ class LinearClustering():
         ''' Check if there are overlaps between neighbouring clusters or if clusters
             are contained within other clusters. '''
         if len(clustered_data) != 1:
-            # Check if neighbouring clusters overlap.
+#            # Check if neighbouring clusters overlap.
+#            pre_clustered_data = deepcopy(clustered_data)
+#            clustered_data = self.check_cluster_overlap(clustered_data, linear_params, len(clustered_data))
+#            # Check if satisfying this constraint has changed the clustering.
+#            if pre_clustered_data != clustered_data:
+#                changes.append(True)
+#            else:
+#                changes.append(False)
+#        _, linear_params, clustering_cost = self.calc_cluster_models(self.x, self.y, clustered_data)
             pre_clustered_data = deepcopy(clustered_data)
-            clustered_data = self.check_cluster_overlap(clustered_data, linear_params, len(clustered_data))
-            # Check if satisfying this constraint has changed the clustering.
+            clustered_data = self.check_cluster_overlap(clustered_data)
             if pre_clustered_data != clustered_data:
                 changes.append(True)
             else:
                 changes.append(False)
-        _, linear_params, clustering_cost = self.calc_cluster_models(self.x, self.y, clustered_data)
         if self.plotting == True:
             fig = self.plotMedoids(clustered_data, None, linear_params, clustering_cost)
             fig.savefig(self.plotting_dir+f'/after_checking_overlaps_{time.time()}.pdf', bbox_inches='tight')
@@ -371,6 +378,10 @@ class LinearClustering():
                 bad_clusters, clustered_data = self.check_cluster_sparsity(clustered_data)
                 if bad_clusters != None:
                     clustered_data = self.merge_clusters(clustered_data, bad_clusters)
+                    _, linear_params, clustering_cost = self.calc_cluster_models(self.x, self.y, clustered_data)
+                    if self.plotting == True:
+                        fig = self.plotMedoids(clustered_data, None, linear_params, clustering_cost)
+                        fig.savefig(self.plotting_dir+f'/sparsity_{time.time()}.pdf', bbox_inches='tight')
             # Check if satisfying this constraint has changed the clustering.
             if pre_clustered_data != clustered_data:
                 changes.append(True)
@@ -422,14 +433,15 @@ class LinearClustering():
         for i in range(len(clustered_data)):
             if len(clustered_data[i]) > 1:
                 sorted_datapoints = sorted(cluster_datapoints[i][0])
-                cluster_differences = [sorted_datapoints[j+1]-sorted_datapoints[j] for j in range(len(sorted_datapoints)-1)]
+#                cluster_differences = [sorted_datapoints[j+1]-sorted_datapoints[j] for j in range(len(sorted_datapoints)-1)]
+                cluster_differences = np.diff(sorted_datapoints)
 #                try:
 #                    print(max(cluster_differences))
 #                except:
 #                    print(cluster_differences, clustered_data[i])
                 # value of the dividing point when sorted
                 if max(cluster_differences) > self.gaps_threshold:
-                    dividing_point = sorted_datapoints[cluster_differences.index(max(cluster_differences))]
+                    dividing_point = sorted_datapoints[np.argmax(cluster_differences)]
                     return i, dividing_point, clustered_data
 
         return None, None, clustered_data
@@ -467,77 +479,86 @@ class LinearClustering():
 
 
     '''--------------------------OVERLAP---------------------------'''
+    def separate_overlapping_clusters(self, clustered_datapoints, clustered_data, c1, c2):
+        x1, y1, idx1 = clustered_datapoints[c1][0], clustered_datapoints[c1][1], clustered_data[c1]
+        x2, y2, idx2 = clustered_datapoints[c2][0], clustered_datapoints[c2][1], clustered_data[c2]
 
-    def check_cluster_overlap(self, clustered_data, linear_params, K):
+
+        # Convert to numpy arrays for convenience
+        x1, y1, idx1 = np.array(x1), np.array(y1), np.array(idx1)
+        x2, y2, idx2 = np.array(x2), np.array(y2), np.array(idx2)
+
+        # Get x-ranges
+        min1, max1 = x1.min(), x1.max()
+        min2, max2 = x2.min(), x2.max()
+
+        # Case 1: x1 is completely inside x2
+        if min1 >= min2 and max1 <= max2:
+            # Merge c1 into c2
+            clustered_data[c2] = np.concatenate([idx2, idx1])
+
+            # Remove c1
+            del clustered_data[c1]
+            return True, clustered_data
+
+        # Case 2: x2 is completely inside x1
+        if min2 >= min1 and max2 <= max1:
+            # Merge c2 into c1
+            clustered_data[c1] = np.concatenate([idx1, idx2])
+
+            # Remove c2
+            del clustered_data[c2]
+            return True, clustered_data
+
+        # Case 3: Partial overlap — split at midpoint
+        if (min1 < min2 < max1):
+            overlap_start = min2
+            overlap_end = max1
+
+            midpoint = (overlap_start + overlap_end) / 2
+
+            # Split each cluster into left and right parts
+            left_cluster = []
+            right_cluster = []
+            for i in clustered_data[c1]:
+                if self.x[i] <= midpoint:
+                    left_cluster.append(i)
+                else:
+                    right_cluster.append(i)
+            for i in clustered_data[c2]:
+                if self.x[i] <= midpoint:
+                    left_cluster.append(i)
+                else:
+                    right_cluster.append(i)
+            # Update clusters
+            clustered_data[c1] = left_cluster
+            clustered_data[c2] = right_cluster
+
+            return True, clustered_data
+        else:
+            return False, clustered_data
+
+    def check_cluster_overlap(self, clustered_data):
         cluster_datapoints = self.cluster_indices_to_datapoints(clustered_data)
-        cluster_ranges = [[min(cluster_datapoints[i][0]), max(cluster_datapoints[i][0])] for i in range(len(cluster_datapoints))]
-        new_clustering = deepcopy(clustered_data)
-        for cluster_num, cluster in enumerate(clustered_data):
-            if cluster_num < len(clustered_data)-1:
-                range1 = cluster_ranges[cluster_num]
-                range2 = cluster_ranges[cluster_num+1]
-                # If the beginning of the following cluster falls within this cluster, separate them through the midpoint of the intersection.
-                method = None
-                if (range1[0] <= range2[0] <= range1[1]) and (range1[0] <= range2[1] <= range1[1]):
-                    method = 'contain'
-                elif (range1[0] <= range2[0] <= range1[1]) or (range1[0] <= range2[1] <= range1[1]):
-                    method = 'overlap'
-
-                if method == 'overlap' or method == 'contain':
-                    if method == 'overlap':
-                        midpoint = range2[0] + (range1[1] - range2[0])/2
-                    elif method == 'contain':
-                        midpoint = (range1[0] - range1[1])/2
-
-#
-                    both_cluster_indices = cluster + clustered_data[cluster_num+1]
-
-                    new_cluster1, new_cluster2 = [], []
-#
-                    new1xs, new2xs = [], []
-                    for indexed_point in both_cluster_indices:
-                        x = self.x[indexed_point]
-                        y = self.y[indexed_point]
-                        if x <= midpoint:
-                            new_cluster1.append(indexed_point)
-                            new1xs.append(x)
-                        else:
-                            new_cluster2.append(indexed_point)
-                            new2xs.append(x)
-                    clustered_data[cluster_num] = new_cluster1
-                    clustered_data[cluster_num+1] = new_cluster2
-#
-#                    fig, axes = plt.subplots(1,2, figsize=(20*0.39,4*0.39))
-#                    axes[0].scatter(self.x[cluster], self.y[cluster], color='blue', s=1)
-#                    m, c = LR(self.x[cluster], self.y[cluster])
-#                    axes[0].plot(self.x[cluster], m*self.x[cluster]+c, color='blue', linewidth=0.5)
-#                    axes[0].scatter(self.x[clustered_data[cluster_num+1]], self.y[clustered_data[cluster_num+1]], color='red', s=1)
-#                    m, c = LR(self.x[clustered_data[cluster_num+1]], self.y[clustered_data[cluster_num+1]])
-#                    axes[0].plot(self.x[clustered_data[cluster_num+1]], m*self.x[clustered_data[cluster_num+1]]+c, color='red', linewidth=0.5)
-#                    axes[0].plot([midpoint, midpoint], [0, 1], color='black', linestyle='--')
-#                    axes[1].scatter(new1xs, [self.y[i] for i in new_cluster1], color='blue', s=1)
-#                    if new_cluster1 != []:
-#                        m, c = LR(new1xs, [self.y[i] for i in new_cluster1])
-#                        axes[1].plot(new1xs, m*new1xs+c, color='blue', linewidth=0.5)
-#                    axes[1].scatter(new2xs, [self.y[i] for i in new_cluster2], color='red', s=1)
-#                    if new_cluster2 != []:
-#                        m, c = LR(new2xs, [self.y[i] for i in new_cluster2])
-#                        axes[1].plot(new2xs, m*new2xs+c, color='red', linewidth=0.5)
-#                    axes[1].plot([midpoint, midpoint], [0, 1], color='black', linestyle='--')
-#                    for ax in [0,1]:
-#                        axes[ax].set_xlim(1.05*(min(self.x)), 1.05*(max(self.x)))
-#                        axes[ax].set_ylim(1.05*(min(self.y)), 1.05*(max(self.y)))
-#                        axes[ax].set_xlabel(r'$x$', fontsize=11)
-#                        axes[ax].set_xticklabels(axes[ax].get_xticklabels(), fontsize=11)
-#                    axes[0].set_ylabel(r'$\hat{y}$', fontsize=11)
-#                    axes[1].set_ylabel('')
-#                    axes[1].set_yticklabels('')
-#                    fig.savefig(f'Figures/Clustering/OptimisedClusters/{self.feature_name}/overlap_{cluster_num}_{cluster_num+1}_{K}.pdf', bbox_inches='tight')
-#                    fig = self.plotMedoids(clustered_data, None, linear_params, clustering_cost)
-#                    fig.savefig(f'Figures/Clustering/OptimisedClusters/overlap_{cluster_num}_{cluster_num+1}_{K}.pdf')
-
-        clustered_data = [cluster for cluster in clustered_data if cluster != []]
+        bad_clusters = True
+        while bad_clusters:
+            changed_clusters = False
+            for c_num in range(len(clustered_data)-1):
+                changed_clusters, clustered_data = self.separate_overlapping_clusters(cluster_datapoints, clustered_data, c_num, c_num+1)
+                clustered_data = [list(c) for c in clustered_data]
+                if changed_clusters:
+                    cluster_datapoints = self.cluster_indices_to_datapoints(clustered_data)
+                    _, linear_params, clustering_cost = self.calc_cluster_models(self.x, self.y, clustered_data)
+                    if self.plotting:
+                        fig = self.plotMedoids(clustered_data, None, linear_params, clustering_cost)
+                        fig.savefig(self.plotting_dir+f'/overlap_{time.time()}.pdf', bbox_inches='tight')
+                    break
+            if not changed_clusters:
+                bad_clusters = False
         return clustered_data
+
+
+
 
     '''--------------------------SPARSITY & COVERAGE---------------------------'''
 
@@ -547,24 +568,35 @@ class LinearClustering():
         clustered_datapoints = self.cluster_indices_to_datapoints(clustered_data)
         largest_cluster_size = max([len(cluster) for cluster in clustered_data])
 
+
+#        def css_score(cluster_xs):
+#            return len(cluster_xs)/abs(max(cluster_xs) - min(cluster_xs))
+#
+#        all_css_score = [css_score(clustered_datapoints[c][0]) for c in range(len(clustered_data))]
+
         new_clustering = deepcopy(clustered_data)
         for i in range(len(clustered_data)):
 
             sparsity = len(clustered_data[i])/largest_cluster_size
-#            sparsity = len(clustered_data[i])/len(self.x)
-
-#            if i == len(clustered_data)-1:
-#                coverage = abs(max(clustered_datapoints[i][0]) - max(clustered_datapoints[i-1][0]))
-#            else:
             cluster_max = max(clustered_datapoints[i][0])
             cluster_min = min(clustered_datapoints[i][0])
-            coverage = abs(max(clustered_datapoints[i][0]) - min(clustered_datapoints[i][0]))
+            coverage = abs(cluster_max - cluster_min)
+#            if coverage == 0:
+#                return i, clustered_data
             coverage = coverage/data_x_range
+#
+#            local_density = len(clustered_data[i])/coverage
+#            sparsity = local_density
+#            css = css_score(clustered_datapoints[i][0])/np.mean(all_css_score)
+#            sparsity = css
+#            print(f'Threshold: {self.sparsity_threshold}, Sparsity: {sparsity}')
+
+#            coverage = local_density
 
             is_sparsity = False
             is_coverage = False
-            if coverage < self.coverage_threshold:
-                is_coverage = True
+#            if coverage < self.coverage_threshold:
+#                is_coverage = True
             if sparsity < self.sparsity_threshold:
                 is_sparsity = True
 
@@ -773,8 +805,8 @@ class LinearClustering():
         colours = self.colours
         fig, axes = plt.subplots(1,1,figsize=(15*inch_to_cm,8*inch_to_cm))
         axes = fig.axes
-        axes[0].set_xlabel(f'$x$', fontsize=11)
-        axes[0].set_ylabel(f'$\hat{{y}}$', fontsize=11)
+        axes[0].set_xlabel(f'{self.feature_name}  $x$', fontsize=11)
+        axes[0].set_ylabel(f'{self.target_name}  $\hat{{y}}$', fontsize=11)
 
 #        colours = []
         for i in range(len(clustered_data)):
@@ -787,7 +819,7 @@ class LinearClustering():
 #            axes[0].vlines([min(clustered_data[i][0]), max(clustered_data[i][0])], -10, 40, color=colour, label='_nolegend_')
             axes[0].plot(cluster_range, w*cluster_range+b, linewidth=0.5, c=colour)
         if clustering_cost:
-            axes[0].set_title(f'K-Medoids clustering of LLR models into {len(clustered_data)} clusters \n  Clustering Cost: {clustering_cost:.2f}', fontsize=11)
+            axes[0].set_title(f'K-Medoids clustering with {len(clustered_data)} clusters \n  Clustering Cost: {clustering_cost:.2f}', fontsize=11)
 
 #        try:
 #            axes[0].legend([str(i) for i in range(len(clustered_data))], loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=len(clustered_data)/2, fontsize=11)

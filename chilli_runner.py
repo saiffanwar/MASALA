@@ -14,19 +14,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.ensemble import GradientBoostingRegressor
 from itertools import product
-
-
-from MidasDataProcessing import MidasDataProcessing
-from midasDistances import combinedFeatureDistances, calcAllDistances, calcSingleDistance, pointwiseDistance
-import midas_model_data as midas
-
-from phm08_model_data import RUL
-
-from housing import CaliforniaHousingModel
-from data_manipulator import attribution_percentage_score, shap_attribution_percentage_score, fidelity_via_feature_removal
-
-import webtrisDataProcessing
-from webtrismodels import webTRIS
+import json
+from datasets import BaseModelData
 
 from chilli import CHILLI, exp_sorter
 from masala import masala
@@ -66,6 +55,8 @@ parser.add_argument('--results', action=argparse.BooleanOptionalAction)
 parser.add_argument('--lime', action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument('--chilli', action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument('--masala', action=argparse.BooleanOptionalAction, default=True)
+parser.add_argument('-lmc', '--load_masala_clustering', action=argparse.BooleanOptionalAction, default=True)
+parser.add_argument('--verbose', action=argparse.BooleanOptionalAction, default=False)
 
 
 
@@ -75,142 +66,40 @@ if args.load_model == 'y':
 else:
     args.load_model = False
 
-def main():
-    dataset = args.dataset
-
-    if dataset == 'MIDAS':
-        midas_runner = midas.MIDAS(load_model=args.load_model, model_type=args.model_type)
-        x_train, x_test, y_train, y_test, features = midas_runner.data.X_train, midas_runner.data.X_test, midas_runner.data.y_train, midas_runner.data.y_test, midas_runner.data.trainingFeatures
-
-        target_feature = 'heathrow air_temperature'
-        discrete_features = ['heathrow cld_ttl_amt_id']
-        model = midas_runner.train_midas_model()
-        y_train_pred, y_test_pred = midas_runner.make_midas_predictions(model)
-
-        sampling=False
-        sparsity_threshold, coverage_threshold, starting_k, neighbourhood_threshold = 0.05, 0.05, 10, 0.05
-#        x_test = x_train
-#        y_test = y_train
-#        y_test_pred = y_train_pred
-        y_pred = y_test_pred
-
-        manipulated_features = ['heathrow wind_speed']
-        manipulated_feature_idxs = [features.index(f) for f in manipulated_features]
-
-    elif dataset == 'PHM08':
-        phm08_runner = RUL(model_type=args.model_type, load_model=args.load_model)
-        x_train, x_test, y_train, y_test, features = phm08_runner.datapreprocessing()
-        target_feature = 'RUL'
-        discrete_features = ['s1', 's5', 's6', 's10', 's16', 's18', 's19']
-        if args.load_model:
-            with open(f'saved/models/PHM08_model.pck', 'rb') as file:
-                model = pck.load(file)
-        else:
-            model = phm08_runner.train()
-        y_train_pred, y_test_pred = phm08_runner.evaluate(model, x_train, x_test, y_train, y_test)
-        model = model.predict
-
-        sampling = True
-
-    elif dataset == 'housing':
-        model_runner = CaliforniaHousingModel(model_type=args.model_type)
-#        model_runner.run_pipeline()
-        model_runner.load_data()
-        model_runner.preprocess()
-        if args.load_model:
-            model_runner.model = pck.load(open(f'saved/models/housing_{args.model_type}.pck', 'rb'))
-        else:
-            model_runner.train()
-        model_runner.evaluate()
-
-        x_train, x_test, y_train, y_test, features = model_runner.X_train, model_runner.X_test, model_runner.y_train, model_runner.y_test, model_runner.df.columns.tolist()
-        features = features[:-1]
-        target_feature = 'MedHouseVal'
-        discrete_features = []
-        model = model_runner.model
-        y_train_pred = model.predict(x_train)
-        y_test_pred = model.predict(x_test)
-#        sparsity_threshold, coverage_threshold, starting_k, neighbourhood_threshold = 0.5, 0.05, 5, 0.5
-        sampling = False
-        x_train = np.array(x_train)
-        x_test = np.array(x_test)
-        y_train = np.array(y_train)
-        y_test = np.array(y_test)
-        model = model_runner.model.predict
-
-        manipulated_features = ['MedInc', 'HouseAge']
-        manipulated_feature_idxs = [features.index(f) for f in manipulated_features]
-        sampling=True
-
-    elif dataset == 'webTRIS':
-        webtris_data = webtrisDataProcessing.DataProcessing(siteName='M6/7570A')
-        webtris_runner = webTRIS(webtris_data, model_type=args.model_type, load_model=args.load_model)
-        if args.load_model:
-            with open(f'saved/models/webTRIS_{args.model_type}.pck', 'rb') as file:
-                model = pck.load(file)
-        else:
-            model = webtris_runner.train_model()
-
-        features = webtris_runner.features
+def main(dataset=None, model_type=None):
+    if dataset is None:
+        dataset = args.dataset
+    if model_type is None:
+        model_type = args.model_type
 
 
-        x_train = np.array(webtris_runner.x_train)
-        x_test = np.array(webtris_runner.x_test)
-        y_train = np.array(webtris_runner.y_train)
-        y_test = np.array(webtris_runner.y_test)
-        y_test_pred = model(x_test)
-        y_train_pred = model(x_train)
-        discrete_features = ['Day', 'Time Interval']
-        sampling = True
+    base_model = BaseModelData(dataset, args.load_model, model_type)
 
+    categorical_features = [base_model.features.index(feature) for feature in base_model.discrete_features]
 
-
-    categorical_features = [features.index(feature) for feature in discrete_features]
-
-
-    if sampling:
-        R = np.random.RandomState(42)
-        random_samples = R.randint(2, len(x_test), min(len(x_test), 5000))
-
-        x_train = x_train[random_samples]
-        y_train = y_train[random_samples]
-        x_test = x_test[random_samples]
-        y_test_pred = y_test_pred[random_samples]
-        y_test = y_test[random_samples]
-        print(f'Training samples: {len(x_train)}')
-        print(f'Test samples: {len(x_test)}')
-
-    for f in range(len(features)):
-        sorted_f = np.sort(x_train[:,f])
-        distances= [sorted_f[i+1]-sorted_f[i] for i in range(len(sorted_f)-1)]
-
-    sparsity_threshold, coverage_threshold, neighbourhood_threshold = (None, 0.05, 0.05)
     random.seed(args.e_id*10)
 
     # ---- Same Instances ----
     if args.exp_mode == 'same':
         if args.primary_instance == None:
-            instance = random.randint(0, len(x_test))
+            instance = random.randint(0, len(base_model.x_test))
         else:
             instance = args.primary_instance
         instances = [instance for i in range(10)]
 #            instances=[instance]
-
     #  ---- Random Instances ----
     elif args.exp_mode == 'random':
-        instances = [random.randint(0, len(x_test)) for i in range(args.num_instances)]
+        instances = [random.randint(0, len(base_model.x_test)) for i in range(args.num_instances)]
 #            instances  = [1118, 3552, 261, 3560, 3377, 405, 2417, 389, 2409, 2199, 1567, 3758, 2553, 2779, 3676, 396, 3394, 3373, 3167, 2880]
-
-    print('Generating explanations for instances: ', instances)
 
     # ---- Explanation Generation ----
 
     if args.kernel_width == None:
         kernel_widths = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 #        kernel_widths = [0.2, 0.35, 0.5, 0.65, 0.8, 1.0]
-        if args.dataset == 'MIDAS':
+        if dataset == 'MIDAS':
             kernel_width = None
-        elif args.dataset == 'PHM08':
+        elif dataset == 'PHM08':
             kernel_width = 0.1
     else:
         kernel_width = args.kernel_width
@@ -222,18 +111,18 @@ def main():
 
 #    for kernel_width in kernel_widths:
     if args.chilli:
-        CHILLIExplainer = CHILLI(dataset, model, x_train, y_train, y_train_pred, x_test, y_test, y_test_pred, features, using_chilli=True)
+        CHILLIExplainer = CHILLI(dataset, base_model.model, base_model.x_train, base_model.y_train, base_model.y_train_pred, base_model.x_test, base_model.y_test, base_model.y_test_pred, base_model.features, using_chilli=True)
         CHILLIExplainer.build_explainer(mode='regression', kernel_width=kernel_width, categorical_features=categorical_features)
 
     if args.lime:
-        LIMEExplainer = CHILLI(dataset, model, x_train, y_train, y_train_pred, x_test, y_test, y_test_pred, features, using_chilli=False)
+        LIMEExplainer = CHILLI(dataset, base_model.model, base_model.x_train, base_model.y_train, base_model.y_train_pred, base_model.x_test, base_model.y_test, base_model.y_test_pred, base_model.features, using_chilli=False)
         LIMEExplainer.build_explainer(mode='regression', kernel_width=kernel_width, categorical_features=categorical_features)
 
     if args.masala:
-        MASALAExplainer = masala.MASALA(model, args.model_type, x_test, y_test, y_test_pred, dataset, features, discrete_features, sparsity_threshold=0.05, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.05)
+        MASALAExplainer = masala.MASALA(base_model.model, model_type, base_model.x_test, base_model.y_test, base_model.y_test_pred, dataset, base_model.features, base_model.target_feature, base_model.discrete_features, sparsity_threshold=0.02, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.05, preload_clustering=args.load_masala_clustering)
 
 
-    chilli_results = {'features': features,
+    chilli_results = {'features': base_model.features,
                       'instance_indices': [],
                       'instance_data': [],
                       'exp_instance_prediction':[],
@@ -242,7 +131,7 @@ def main():
                       'model_perturbation_predictions':[],
                       'exp_perturbation_predictions':[],
                       'model_instance_prediction': []}
-    lime_results = {'features': features,
+    lime_results = {'features': base_model.features,
                     'instance_indices': [],
                     'instance_data': [],
                     'exp_instance_prediction':[],
@@ -251,7 +140,7 @@ def main():
                     'model_perturbation_predictions':[],
                     'exp_perturbation_predictions':[],
                     'model_instance_prediction': []}
-    masala_results = {'features': features,
+    masala_results = {'features': base_model.features,
                       'instance_indices': [],
                       'instance_data': [],
                       'exp_instance_prediction':[],
@@ -259,23 +148,23 @@ def main():
                       'model_instance_prediction': [],
                       'local_errors': []}
 
-    model_instance_predictions = [y_test_pred[instance] for instance in instances]
+    model_instance_predictions = [base_model.y_test_pred[instance] for instance in instances]
 
     for instance in tqdm(instances):
 
 #            kw_lime_results = []
 #            kw_chilli_results = []
 #            try:
-        print(f'\n \n ################# Instance  = {instance} ###################')
-        # ------ BASE MODEL ------
-        print(f'Ground Truth: {y_test[instance]}')
-        print(f'Model Prediction: {y_test_pred[instance]}')
+        if args.verbose:
+            print(f'\n \n ################# Instance  = {instance} ###################')
+            # ------ BASE MODEL ------
+            print(f'Ground Truth: {base_model.y_test[instance]}')
+            print(f'Model Prediction: {base_model.y_test_pred[instance]}')
 
 
         # ---- LIME EXPLANATION -------
         if args.lime:
 
-            print('\n ----- LIME EXPLANATION -----')
 
             lime_exp, lime_perturbations, model_perturbation_predictions, exp_perturbation_predictions, model_instance_prediction, exp_instance_prediction = LIMEExplainer.make_explanation(model, instance=instance, num_samples=1000)
 #                LIMEExplainer.interactive_perturbation_plot(instance, lime_exp, kernel_width, lime_perturbations, model_perturbation_predictions, exp_perturbation_predictions)
@@ -285,13 +174,15 @@ def main():
 #                    kw_lime_results.append([lime_exp, lime_perturbations, model_perturbation_predictions, exp_perturbation_predictions])
 
 #            print(f'LIME Attr %: {lime_attr_per}')
-            print(f'LIME Prediction: {exp_instance_prediction}')
-            print(f'LIME Instance Error: {abs(model_instance_prediction-exp_instance_prediction)}')
-            print(f'LIME Local Error: {mean_absolute_error(model_perturbation_predictions, exp_perturbation_predictions)}')
+            if args.verbose:
+                print('\n ----- LIME EXPLANATION -----')
+                print(f'LIME Prediction: {exp_instance_prediction}')
+                print(f'LIME Instance Error: {abs(model_instance_prediction-exp_instance_prediction)}')
+                print(f'LIME Local Error: {mean_absolute_error(model_perturbation_predictions, exp_perturbation_predictions)}')
 
 #            lime_results['Attr_%s'].append(lime_attr_per)
             lime_results['instance_indices'].append(instance)
-            lime_results['instance_data'].append(x_test[instance])
+            lime_results['instance_data'].append(base_model.x_test[instance])
             lime_results['exp_instance_prediction'].append(exp_instance_prediction)
             lime_results['model_instance_prediction'].append(model_instance_prediction)
             lime_results['explanations'].append(lime_exp)
@@ -301,19 +192,20 @@ def main():
 
         # ---- CHILLI EXPLANATION -------
         if args.chilli:
-            print('\n ----- CHILLI EXPLANATION -----')
 
             chilli_exp, chilli_perturbations, model_perturbation_predictions, exp_perturbation_predictions, model_instance_prediction, exp_instance_prediction = CHILLIExplainer.make_explanation(model, instance=instance, num_samples=1000)
             if args.plots:
                 CHILLIExplainer.plot_perturbations(instance, chilli_exp, kernel_width, chilli_perturbations, model_perturbation_predictions, exp_perturbation_predictions)
 #                    kw_chilli_results.append([chilli_exp, chilli_perturbations, model_perturbation_predictions, exp_perturbation_predictions])
 
-            print(f'CHILLI Prediction: {exp_instance_prediction}')
-            print(f'CHILLI Instance Error: {abs(model_instance_prediction-exp_instance_prediction)}')
-            print(f'CHILLI Local Error: {mean_absolute_error(model_perturbation_predictions, exp_perturbation_predictions)}')
+            if args.verbose:
+                print('\n ----- CHILLI EXPLANATION -----')
+                print(f'CHILLI Prediction: {exp_instance_prediction}')
+                print(f'CHILLI Instance Error: {abs(model_instance_prediction-exp_instance_prediction)}')
+                print(f'CHILLI Local Error: {mean_absolute_error(model_perturbation_predictions, exp_perturbation_predictions)}')
 
             chilli_results['instance_indices'].append(instance)
-            chilli_results['instance_data'].append(x_test[instance])
+            chilli_results['instance_data'].append(base_model.x_test[instance])
             chilli_results['exp_instance_prediction'].append(exp_instance_prediction)
             chilli_results['model_instance_prediction'].append(model_instance_prediction)
             chilli_results['explanations'].append(chilli_exp)
@@ -328,7 +220,7 @@ def main():
                 explanation, local_error = MASALAExplainer.explain_instance(instance=instance)
 
                 masala_results['instance_indices'].append(instance)
-                masala_results['instance_data'].append(x_test[instance])
+                masala_results['instance_data'].append(base_model.x_test[instance])
                 masala_results['exp_instance_prediction'].append(explanation.target_exp_y)
                 masala_results['model_instance_prediction'].append(explanation.target_model_y)
                 masala_results['explanations'].append(explanation)
@@ -350,15 +242,25 @@ def main():
         masala_ran = True
     if args.results:
         if args.lime:
-            with open(f'saved/results/{dataset}/LIME_{dataset}_{args.model_type}#_{args.e_id}_{args.num_instances}_kw={kernel_width}.pck', 'wb') as f:
+            with open(f'saved/results/{dataset}/LIME_{dataset}_{model_type}#_{args.e_id}_{args.num_instances}_kw={kernel_width}.pck', 'wb') as f:
                 pck.dump(lime_results, f)
         if args.chilli:
-            with open(f'saved/results/{dataset}/CHILLI_{dataset}_{args.model_type}#_{args.e_id}_{args.num_instances}_kw={kernel_width}.pck', 'wb') as f:
+            with open(f'saved/results/{dataset}/CHILLI_{dataset}_{model_type}#_{args.e_id}_{args.num_instances}_kw={kernel_width}.pck', 'wb') as f:
                 pck.dump(chilli_results, f)
         if args.masala:
-            with open(f'saved/results/{dataset}/MASALA_{dataset}_{args.model_type}#_{args.e_id}_{args.num_instances}.pck', 'wb') as f:
+            with open(f'saved/results/{dataset}/MASALA_{dataset}_{model_type}#_{args.e_id}_{args.num_instances}.pck', 'wb') as f:
                 pck.dump(masala_results, f)
 
 
 if __name__ == '__main__':
-    main()
+    dataset_models = {
+                    'housing': ['GBR', 'SVR', 'RF'],
+                    'MIDAS': ['GBR', 'SVR', 'RNN'],
+                    'webTRIS': ['GBR', 'SVR', 'RF'],
+                    }
+    for dataset in dataset_models.keys():
+#    for dataset in ['webTRIS']:
+        for model_type in dataset_models[dataset]:
+            print(f'Running {dataset} with {model_type}')
+            main(dataset=dataset, model_type=model_type)
+#    main()

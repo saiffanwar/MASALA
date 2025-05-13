@@ -148,17 +148,19 @@ class MultivariateRegression():
 
 
 class webTRIS():
-    def __init__(self,dataprocessing, model_type='SVR', load_model=False):
+    def __init__(self,dataprocessing, feature_names, model_type='SVR', load_model=False):
         self.load_model = load_model
         self.DataProcessing = dataprocessing
         self.y_pred = None
         self.model_type = model_type
+        self.features = feature_names
         self.dataSplit()
 
     def dataSplit(self, ):
-        self.features = ['Time Interval','0 - 520 cm', '521  - 660 cm', '661 - 1160 cm', 'Day', 'Avg mph']
 
         df = self.DataProcessing.fetchData()
+        df = df.rename(columns=self.features)
+        self.features = list(self.features.values())
         x, y, _ = self.DataProcessing.augment(df)
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x, y, test_size=0.2, random_state=42)
         # print('Computed Data: ', self.x_test)
@@ -171,7 +173,6 @@ class webTRIS():
 
 
     def train_model(self,):
-        print('Training SVR model')
         if self.model_type == 'RNN':
             if torch.cuda.is_available():
                 device = torch.device("cuda")
@@ -210,37 +211,43 @@ class webTRIS():
             self.opt = Optimization(model=self.model.to(device), loss_fn=loss_fn, optimizer=optimizer)
 #
             if self.load_model:
-                self.model.load_state_dict(torch.load(f'saved/models/webtris_{self.model_type}.pck'))
+                self.model.load_state_dict(torch.load(f'saved/models/webTRIS_{self.model_type}.pck'))
             else:
                 self.opt.train(self.train_dataloader, self.train_dataloader, batch_size=self.batch_size, n_epochs=self.n_epochs, n_features=self.input_dim)
 #        print(self.load_model)
 #
-                torch.save(self.model.state_dict(), f'saved/models/webtris_{self.model_type}.pck')
+                torch.save(self.model.state_dict(), f'saved/models/webTRIS_{self.model_type}.pck')
 
             return self.opt.predictor_from_numpy
 
         else:
-            if self.model_type == 'SVR':
-                model = SVR(kernel='poly', verbose=True)
-            elif self.model_type == 'RF':
-                model = RandomForestRegressor(n_estimators=100, random_state=42)
-            elif self.model_type == 'GBR':
-                model = GradientBoostingRegressor(n_estimators=100, random_state=42)
+            if self.load_model:
+                with open(f'saved/models/webTRIS_{self.model_type}.pck', 'rb') as file:
+                    self.model = pck.load(file)
 
-            np_x = np.array(self.x_train)
-            np_y = np.array(self.y_train).ravel()
-            model.fit(np_x, np_y).predict(np_x)
-            with open(f'saved/models/webtris_{self.model_type}.pck', 'wb') as file:
-                pck.dump(model, file)
+            else:
+                if self.model_type == 'SVR':
+                    self.model = SVR(kernel='poly', verbose=True)
+                elif self.model_type == 'RF':
+                    self.model = RandomForestRegressor(n_estimators=100, random_state=42)
+                elif self.model_type == 'GBR':
+                    self.model = GradientBoostingRegressor(n_estimators=100, random_state=42)
 
-            self.y_test_pred = model.predict(np.array(self.x_test))
-            self.y_train_pred = model.predict(np.array(self.x_train))
+                np_x = np.array(self.x_train)
+                np_y = np.array(self.y_train).ravel()
+                self.model.fit(np_x, np_y)
+                print('Saving model: ', self.model_type)
+                with open(f'saved/models/webTRIS_{self.model_type}.pck', 'wb') as file:
+                    pck.dump(self.model, file)
 
-            fig = midasPlotPredictions(self.features, self.x_test, self.y_test, self.y_test_pred)
-            fig.savefig(f'webTRIS/Figures/webTRIS_{self.model_type}.png')
+            self.y_test_pred = self.model.predict(np.array(self.x_test))
+            self.y_train_pred = self.model.predict(np.array(self.x_train))
+
+#            fig = midasPlotPredictions(self.features, self.x_test, self.y_test, self.y_test_pred)
+#            fig.savefig(f'webTRIS/Figures/webTRIS_{self.model_type}.png')
 
 
-            return model.predict
+            return self.model.predict
 
     def predictor(self, features):
 
@@ -254,10 +261,9 @@ class webTRIS():
         mse = mean_squared_error(np.array(self.y_test), self.y_pred, squared=False)
         print('RMSE Achieved by SVR model: ', mse)
 
-        fig = plotPredictions(features, self.x_test, self.y_test, self.y_pred)
-        fig.savefig('Figures/PredictionsSVR.png', dpi=600, bbox_inches='tight')
-        plt.show()
-
+#        fig = plotPredictions(features, self.x_test, self.y_test, self.y_pred)
+#        fig.savefig('Figures/PredictionsSVR.png', dpi=600, bbox_inches='tight')
+#
         return mse
 
     def eval(self,):
