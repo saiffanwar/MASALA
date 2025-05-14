@@ -43,13 +43,12 @@ def exp_sorter(exp_list, features):
 
 class CHILLI():
 
-    def __init__(self, dataset, model, x_train, y_train, y_train_pred, x_test, y_test, y_test_pred, features, using_chilli=True):
+    def __init__(self, dataset, model, x_train, y_train, x_test, y_test, y_test_pred, features, using_chilli=True):
         self.dataset = dataset
         self.model = model
         # These should be scaled numpy arrays
         self.x_train = x_train
         self.y_train = y_train
-        self.y_train_pred = y_train_pred
         self.x_test = x_test
         self.y_test = y_test
         self.y_test_pred = y_test_pred
@@ -66,7 +65,6 @@ class CHILLI():
         ground_truth = self.y_test[instance]
         instance_prediction = predictor(self.x_test[instance].reshape(1,-1))[0]
         exp, local_model, perturbations, model_perturbation_predictions, exp_perturbation_predictions = self.explainer.explain_instance(self.x_test[instance], instance_num=instance, predict_fn=predictor, num_features=num_features, num_samples=num_samples, using_chilli=self.using_chilli)
-        self.local_model = local_model
         exp_instance_prediction = exp_perturbation_predictions[0]
         model_perturbation_predictions = np.array(model_perturbation_predictions).flatten()
         exp_perturbation_predictions = np.array(exp_perturbation_predictions).flatten()

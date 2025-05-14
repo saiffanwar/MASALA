@@ -42,11 +42,11 @@ class MASALA:
 #        self.clustering_generator.matplot_all_clustering()
 
     def initialise_explainer(self,):
-        self.explanation_generator = LLCExplanation(model=self.model, model_type=self.model_type, x_test=self.x_test, y_pred=self.y_pred, dataset=self.dataset, features=self.features, discrete_features=self.discrete_features, sparsity_threshold=self.sparsity_threshold, coverage_threshold=self.coverage_threshold, starting_k=self.starting_k, neighbourhood_threshold=self.neighbourhood_threshold)
+        self.explanation_generator = LLCExplanation(model=self.model, model_type=self.model_type, x_test=self.x_test, y_pred=self.y_pred, dataset=self.dataset, features=self.features, discrete_features=self.discrete_features, sparsity_threshold=self.sparsity_threshold, coverage_threshold=self.coverage_threshold, starting_k=self.starting_k, neighbourhood_threshold=self.neighbourhood_threshold, experiment_id=self.experiment_id)
         self.feature_ensembles = self.explanation_generator.feature_ensembles
 
-    def explain_instance(self, instance,):
-        explanation, perturbation_error = self.explanation_generator.generate_explanation(self.x_test[instance], instance)
+    def explain_instance(self, instance, perturbations=False):
+        explanation, perturbation_error = self.explanation_generator.generate_explanation(self.x_test[instance], instance, perturbations=perturbations)
 #        if plotting:
 #            self.explanation_generator.interactive_exp_plot(explanation)
 

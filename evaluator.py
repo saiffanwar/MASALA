@@ -31,7 +31,7 @@ def calculate_instance_fidelity(model_instance_prediction, exp_instance_predicti
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str, default='webTRIS')
-parser.add_argument('--model_type', type=str, default='GBR')
+parser.add_argument('--model_type', type=str, default='SVR')
 parser.add_argument('--experiment_num', type=int, default=1)
 parser.add_argument('--num_instances', type=int, default=30)
 parser.add_argument('--kernel_width', type=float, default=None)
@@ -336,31 +336,75 @@ def varying_interpretability(kernel_widths):
         fig.legend(['LIME - Local', 'LIME - Instance', 'CHILLI - Local', 'CHILLI - Instance', 'MASALA - Local', 'MASALA - Instance'], loc='upper center', ncols=2, bbox_to_anchor=(0.5, 1.30))
         fig.savefig(f'Figures/{args.dataset}_{model}_interpretability.png', bbox_inches='tight', dpi=300)
 
-def exp_consistency(sparsity_threshold=0.02, starting_k=5):
-    repeated_explanations = defaultdict(list)
-    experiments = list(range(1,5))
-    for e_id in experiments:
-        with open(f'saved/results/{dataset}/MASALA_{args.dataset}_{args.model_type}#_{e_id}_{args.num_instances}_{sparsity_threshold}_{starting_k}.pck', 'rb') as file:
-            result = pck.load(file)
-        for n in range(len(result['explanations'])):
-            repeated_explanations[result['instance_indices'][n]].append(np.array(result['explanations'][n].exp_model.coef_))
+def masala_consistency(sparsity_threshold=0.02, starting_k=5):
+    exp_values = []
+    with open(f'saved/results/{args.dataset}/MASALA_{args.dataset}_{args.model_type}#_1_same_{args.num_instances}_{sparsity_threshold}_{starting_k}.pck', 'rb') as file:
+        result = pck.load(file)
+    for n in range(len(result['explanations'])):
+        exp_coef = np.array(result['explanations'][n].exp_model.coef_)
+        normalised_exp_coef = [i/max(abs(exp_coef)) for i in exp_coef]
+        exp_values.append(normalised_exp_coef)
+
+    return np.transpose(np.array(exp_values))
+
+def chilli_consistency(kw=0.1, method='CHILLI'):
+    exp_values = []
+    with open(f'saved/results/{args.dataset}/{method}_{args.dataset}_{args.model_type}#_1_same_{args.num_instances}_kw={kw}.pck', 'rb') as file:
+        result = pck.load(file)
+    for n in range(len(result['explanations'])):
+        exp_coef = np.array(result['explanations'][n].local_model.coef_)
+
+#        exp_values.append(normalised_exp_coef)
+        normalised_exp_coef = [i/max(abs(exp_coef)) for i in exp_coef]
+        exp_values.append(normalised_exp_coef)
+# normalise between 0 and 1
+#    exp_values = [i/max_val for i in exp_values]
+#    print(exp_values)
+    return np.transpose(np.array(exp_values))
+
+def exp_consistency(sparsity_threshold=0.02, starting_k=5, kw=0.1):
+
+    masala_stds = []
+    chilli_stds = []
+    lime_stds = []
+
+    for kw in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]:
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+        exp_values = masala_consistency(sparsity_threshold, starting_k)
+        masala_stds.append(np.mean([np.std(s) for s in exp_values]))
+
+        sns.heatmap(ax=fig.get_axes()[2], data=exp_values, annot=True, fmt='.2f', cmap='coolwarm')
+
+        exp_values = chilli_consistency(kw, 'CHILLI')
+        chilli_stds.append(np.mean([np.std(s) for s in exp_values]))
+        sns.heatmap(ax=fig.get_axes()[0], data=exp_values, annot=True, fmt='.2f', cmap='coolwarm')
+
+        exp_values = chilli_consistency(kw, 'LIME')
+        lime_stds.append(np.mean([np.std(s) for s in exp_values]))
+        sns.heatmap(ax=fig.get_axes()[1], data=exp_values, annot=True, fmt='.2f', cmap='coolwarm')
+
+        axes[0].set_yticklabels(features[args.dataset])
+
+        fig.savefig(f'Figures/{args.dataset}_{args.model_type}_{kw}_consistency.png', bbox_inches='tight', dpi=300)
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(kernel_widths, masala_stds, label='MASALA', color=masala_color)
+    ax.plot(kernel_widths, chilli_stds, label='CHILLI', color=chilli_color)
+    ax.plot(kernel_widths, lime_stds, label='LIME', color=lime_color)
+    ax.set_title(f'{args.dataset} {args.model_type} Consistency')
+    ax.set_xlabel('Kernel Width')
+    ax.set_ylabel('MAE')
+    ax.legend()
+    fig.savefig(f'Figures/{args.dataset}_{args.model_type}_consistency.png', bbox_inches='tight', dpi=300)
 
 
-    for instance in repeated_explanations.keys():
-        print(np.transpose(repeated_explanations[instance]))
-        sns.heatmap(np.transpose(repeated_explanations[instance]), annot=True, fmt='.2f', cmap='coolwarm')
-
-        plt.show()
 
 
 
 
-
-
-for dataset in ['MIDAS', 'housing', 'webTRIS'][:1]:
-    args.dataset = dataset
+exp_consistency()
 #    fidelities()
-    exp_consistency()
 #    masala_fidelities()
 #    exp_variance_box_plot()
 #    varying_interpretability(kernel_widths[:5])

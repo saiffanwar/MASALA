@@ -102,7 +102,18 @@ app.layout = html.Div(
                                 type='number',
                                 value=10,
                                 style={'width': '20%', 'margin-left': '10px'}
-                            )])]),
+                            )]),
+                    html.Div(
+                        children=[
+                            html.Label("Clustering ID", style={'font-weight': 'bold'}),
+                            dcc.Input(
+                                id='clustering-id',
+                                type='number',
+                                value=1,
+                                style={'width': '20%', 'margin-left': '10px'}
+                            )]),
+
+                            ]),
         dcc.Graph(
             id='masala-graph',
             figure=fig
@@ -116,9 +127,10 @@ app.layout = html.Div(
     Input('view-dropdown', 'value'),
     Input('dataset-dropdown', 'value'),
     Input('model-dropdown', 'value'),
-    Input('explanation-instance', 'value')
+    Input('explanation-instance', 'value'),
+    Input('clustering-id', 'value'),
 )
-def toggle_view(view_mode, dataset, model_type, explanation_instance):
+def toggle_view(view_mode, dataset, model_type, explanation_instance, experiment_id):
     global MASALAExplainer
     if dataset == 'housing':
         model_types = [
@@ -138,19 +150,18 @@ def toggle_view(view_mode, dataset, model_type, explanation_instance):
             {'label': 'Support Vector Regressor', 'value': 'SVR'},
             {'label': 'Random Forest', 'value': 'RF'},
         ]
-    if callback_context.triggered[0]['prop_id'] in ['dataset-dropdown.value', 'model-dropdown.value']:
+    if callback_context.triggered[0]['prop_id'] in ['dataset-dropdown.value', 'model-dropdown.value', 'clustering-id.value']:
         if callback_context.triggered[0]['prop_id'] == 'dataset-dropdown.value':
             model_type = model_types[0]['value']
 
         base_model = BaseModelData(dataset, load_model, model_type)
-        MASALAExplainer = masala.MASALA(base_model.model, model_type, base_model.x_test, base_model.y_test, base_model.y_test_pred, dataset, base_model.features, base_model.target_feature, base_model.discrete_features, sparsity_threshold=0.02, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.05, preload_clustering=True)
+        MASALAExplainer = masala.MASALA(base_model.model, model_type, base_model.x_test, base_model.y_test, base_model.y_test_pred, dataset, base_model.features, base_model.target_feature, base_model.discrete_features, sparsity_threshold=0.02, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.05, preload_clustering=True, experiment_id=experiment_id)
 
 
 
-    print(f'Generating Plot for {MASALAExplainer.dataset} with {MASALAExplainer.model_type} model')
+    print(f'Generating Plot for {MASALAExplainer.dataset} with {MASALAExplainer.model_type} model, experiment {experiment_id}')
     if view_mode == 'explanation' or callback_context.triggered[0]['prop_id'] == 'explanation-instance.value':
         explanation, local_error = MASALAExplainer.explain_instance(instance=explanation_instance)
-        print(explanation.exp_model.coef_)
         fig = MASALAExplainer.plot_data(explanation=explanation)
     elif view_mode == 'clustering':
         fig = MASALAExplainer.plot_all_clustering()

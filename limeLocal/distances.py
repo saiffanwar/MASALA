@@ -6,12 +6,16 @@ import math
 from scipy.special import softmax
 import pickle as pck
 from pprint import pprint
+import json
 
-euclideanFeatures = ['heathrow cld_ttl_amt_id', 'heathrow cld_base_ht', 'heathrow visibility', 'heathrow msl_pressure', 'heathrow y', 'heathrow dewpoint', 'heathrow rltv_hum', 'heathrow wind_speed', 'heathrow air_temperature', 'heathrow prcp_amt', 'setting1', 'setting2', 'setting3', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 's12', 's13', 's14', 's15', 's16', 's17', 's18', 's19', 's20', 's21', 'MedInc', 'HouseAge', 'AveRooms', 'AveBedrms', 'Population', 'AveOccup',
-       'Latitude', 'Longitude', '0 - 520 cm', '521  - 660 cm', '661 - 1160 cm', 'Avg mph']
+
+with open('feature_categories.json', 'r') as f:
+    feature_dict = json.load(f)
+
+euclideanFeatures = feature_dict["euclideanFeatures"]
 
 #euclidean_features_2
-cyclicFeatures = ['Date', 'heathrow wind_direction', 'Day',  'Time Interval']
+cyclicFeatures = feature_dict["cyclicFeatures"]
 
 # Cyclic features are calculated with distances going in a circle.
 def cyclic(x1, x2, max_val):
@@ -26,14 +30,8 @@ def binary(instance, perturbation):
 
 # Function to calculate the distance between 2 values for a single feature
 def calcSingleDistance(instanceValue, perturbValue, feature, maxVal, possVal):
-    # These features are calculated as a euclidean distance normalised by the maximum possible value.
-    # if feature in ['cld_ttl_amt_id', 'cld_base_ht', 'visibility', 'msl_pressure', 'y', 'dewpoint', 'rltv_hum', 'wind_speed']:
     if any(f in feature for f in euclideanFeatures):
         distance = abs(instanceValue - perturbValue)/maxVal
-    # These features are binary features.
-    # elif feature in ['Bank Holiday', 'Weekend', 'Monday', 'Morning', 'Afternoon', 'Evening', 'Night']:
-    #     distance = binary(instanceValue, perturbValue)
-    # These features are cyclic features
     if any(f in feature for f in cyclicFeatures):
         distance = cyclic(instanceValue, perturbValue, maxVal)
     return distance

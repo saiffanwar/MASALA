@@ -595,8 +595,8 @@ class LinearClustering():
 
             is_sparsity = False
             is_coverage = False
-#            if coverage < self.coverage_threshold:
-#                is_coverage = True
+            if coverage < self.coverage_threshold:
+                is_coverage = True
             if sparsity < self.sparsity_threshold:
                 is_sparsity = True
 
