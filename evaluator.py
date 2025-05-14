@@ -1,8 +1,11 @@
+from pprint import pprint
+from collections import defaultdict
 import numpy as np
 import pickle as pck
 import pandas as pd
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import matplotlib.pyplot as plt
+import seaborn as sns
 import sys
 from chilli import exp_sorter
 import argparse
@@ -109,32 +112,45 @@ def fidelities():
 
                 print(f'Instance Fidelity: {avg_instance_fidelity}')
 
-        masala_local_fidelity, masala_instance_fidelity = masala_fidelities(model, args.dataset)
-        ax[m].plot(kernel_widths, [masala_local_fidelity]*len(kernel_widths), label='MASALA', color=masala_color, linestyle='--')
-        ax[m].plot(kernel_widths, [masala_instance_fidelity]*len(kernel_widths), label='MASALA', color=masala_color)
+
         ax[m].plot(kernel_widths, lime_local_fidelity, label='LIME', color=lime_color, linestyle='--')
         ax[m].plot(kernel_widths, chilli_local_fidelity, label='CHILLI', color=chilli_color, linestyle='--')
+
+        ax[m].plot(kernel_widths, lime_instance_fidelity, label='LIME', color=lime_color)
+        ax[m].plot(kernel_widths, chilli_instance_fidelity, label='CHILLI', color=chilli_color)
+
+        masala_local_fidelity, masala_instance_fidelity = masala_fidelities(model, args.dataset, starting_k=10, sparsity_threshold=0.02)
+        ax[m].plot(kernel_widths, [masala_local_fidelity]*len(kernel_widths), label='MASALA', color=masala_color, linestyle='--')
+        ax[m].plot(kernel_widths, [masala_instance_fidelity]*len(kernel_widths), label='MASALA', color=masala_color)
+
+        masala_local_fidelity, masala_instance_fidelity = masala_fidelities(model, args.dataset, starting_k=5, sparsity_threshold=0.02)
+        ax[m].plot(kernel_widths, [masala_local_fidelity]*len(kernel_widths), label='MASALA', color='lightblue', linestyle='--')
+        ax[m].plot(kernel_widths, [masala_instance_fidelity]*len(kernel_widths), label='MASALA', color='lightblue')
+
         ax[m].set_title(f'{model} - {cleaned_dataset_names[args.dataset]}')
         ax[m].set_xlabel(r'$\sigma$')
         ax[m].set_xticks(kernel_widths[::2])
 #        ax[0][m].set_xticks([])
 
-        ax[m].plot(kernel_widths, lime_instance_fidelity, label='LIME', color=lime_color)
-        ax[m].plot(kernel_widths, chilli_instance_fidelity, label='CHILLI', color=chilli_color)
 
         if m == 0:
             ax[m].set_ylabel('MAE')
 #            ax[1][m].set_ylabel('Instance MAE')
 
     print_tex_table(table_results)
-    fig.legend(['LIME - Local', 'CHILLI - Local', 'LIME - Instance', 'CHILLI - Instance'], loc='upper center', ncols=2, bbox_to_anchor=(0.5, 1.30))
+    fig.legend(['LIME - Local', 'CHILLI - Local', 'LIME - Instance', 'CHILLI - Instance', 'MASALA (10) - Local', 'MASALA (10) - Instance','MASALA (5) - Local', 'MASALA (5) - Instance'], loc='upper center', ncols=4, bbox_to_anchor=(0.5, 1.30))
     fig.savefig(f'Figures/{args.dataset}_fidelities.pdf', bbox_inches='tight')
 
-def masala_fidelities(model, dataset):
-    with open(f'saved/results/{args.dataset}/MASALA_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}.pck', 'rb') as file:
+def masala_fidelities(model, dataset, starting_k, sparsity_threshold):
+    with open(f'saved/results/{args.dataset}/MASALA_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}_{sparsity_threshold}_{starting_k}.pck', 'rb') as file:
         result = pck.load(file)
     print(f'\n --------- MASALA Results: {args.dataset} {model} --------')
-    instance_errors = [abs(result['model_instance_prediction'][i] - result['exp_instance_prediction'][i]) for i in range(len(result['model_instance_prediction']))]
+#    instance_errors = [abs(result['model_instance_prediction'][i] - result['exp_instance_prediction'][i]) for i in range(len(result['model_instance_prediction']))]
+    instance_errors = []
+    local_errors = []
+    for n in range(len(result['model_instance_prediction'])):
+        if max(abs(result['explanations'][n].exp_model.coef_)) < 1000 :
+            instance_errors.append(calculate_instance_fidelity(result['model_instance_prediction'][n], result['exp_instance_prediction'][n]))
     instance_fidelity = np.mean(instance_errors)
     print(f'Instance Fidelity: {instance_fidelity}')
     local_fidelity = np.mean(result['local_errors'])
@@ -210,13 +226,49 @@ def predict_with_top_k_features(explanation, local_model, instance_data, k):
     return local_model.predict([reduced_instance])[0]
 
 
+def get_masala_top_k_features(model, sparsity_threshold=0.02, starting_k=5):
+
+    masala_result_dict = {'local_fidelity': {k: [] for k in range(len(features[args.dataset]))},
+                    'instance_fidelity': {k: [] for k in range(len(features[args.dataset]))}}
+    with open(f'saved/results/{args.dataset}/MASALA_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}_{sparsity_threshold}_{starting_k}.pck', 'rb') as file:
+        masala_result = pck.load(file)
+
+
+    for n in range(len(masala_result['explanations'])):
+        explanation = masala_result['explanations'][n]
+        instance_data = masala_result['instance_data'][n]
+        local_model = explanation.exp_model
+        if max(abs(local_model.coef_)) < 1000:
+        # Sort instance data and exp based on l)
+            for k in range(len(features[args.dataset])):
+                top_k_instance_prediction = predict_with_top_k_features(local_model.coef_, local_model, instance_data, k)
+                i_f = calculate_instance_fidelity(top_k_instance_prediction, masala_result['model_instance_prediction'][n])
+                masala_result_dict['instance_fidelity'][k].append(i_f)
+                top_k_perturbation_predictions = []
+                kept_preds = []
+                for p in range(len(explanation.local_x)):
+                    p_f = predict_with_top_k_features(local_model.coef_, local_model, explanation.local_x[p], k)
+                    top_k_perturbation_predictions.append(p_f)
+                    kept_preds.append(explanation.local_model_y[p])
+                if len(top_k_perturbation_predictions) > 0:
+                    masala_result_dict['local_fidelity'][k].append(calculate_local_fidelity(top_k_perturbation_predictions, kept_preds))
+#        br
+    local_fidelities = [np.mean(masala_result_dict['local_fidelity'][k]) for k in range(len(features[args.dataset]))]
+    instance_fidelities = [np.mean(masala_result_dict['instance_fidelity'][k]) for k in range(len(features[args.dataset]))]
+    return local_fidelities, instance_fidelities
+
+
+
 def varying_interpretability(kernel_widths):
 
     for m, model in enumerate(models[args.dataset]):
+        print(f'\n {args.dataset} {model} --------')
         max_if = -np.inf
         min_if = np.inf
         max_lf = -np.inf
         min_lf = np.inf
+
+        masala_local_fidelities, masala_instance_fidelities = get_masala_top_k_features(model, sparsity_threshold=0.02, starting_k=5)
 
         fig, axes = plt.subplots(1, len(kernel_widths), figsize=(2*len(kernel_widths), 2), sharey=True)
         for i, kernel_width in enumerate(kernel_widths):
@@ -224,13 +276,7 @@ def varying_interpretability(kernel_widths):
                                     'instance_fidelity': {k: [] for k in range(len(features[args.dataset]))}},
                             'CHILLI': {'local_fidelity': {k: [] for k in range(len(features[args.dataset]))},
                                     'instance_fidelity': {k: [] for k in range(len(features[args.dataset]))}},
-                            'MASALA': {'local_fidelity': [],
-                                       'instance_fidelity': []}
                            }
-            chilli_local_fidelity = {k: [] for k in range(len(features[args.dataset]))}
-            chilli_instance_fidelity = {k: [] for k in range(len(features[args.dataset]))}
-            lime_local_fidelity = {k: [] for k in range(len(features[args.dataset]))}
-            lime_instance_fidelity = {k: [] for k in range(len(features[args.dataset]))}
             for method in ['LIME', 'CHILLI']:
                 with open(f'saved/results/{args.dataset}/{method}_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}_kw={kernel_width}.pck', 'rb') as file:
                     result = pck.load(file)
@@ -255,8 +301,8 @@ def varying_interpretability(kernel_widths):
             for method, color in zip(['LIME', 'CHILLI'], [lime_color, chilli_color]):
                 local_fidelities = [np.mean(result_dict[method]['local_fidelity'][k]) for k in range(len(features[args.dataset]))]
                 instance_fidelities = [np.mean(result_dict[method]['instance_fidelity'][k]) for k in range(len(features[args.dataset]))]
-                axes[i].plot(local_fidelities, label=method, color=color, linestyle='--')
-                axes[i].plot(instance_fidelities, label=method, color=color)
+                axes[i].plot(range(1, len(features[args.dataset])+1), local_fidelities, label=method, color=color, linestyle='--')
+                axes[i].plot(range(1, len(features[args.dataset])+1), instance_fidelities, label=method, color=color)
 
                 if max(local_fidelities) > max_lf:
                     max_lf = max(local_fidelities)
@@ -267,37 +313,19 @@ def varying_interpretability(kernel_widths):
                 if min(instance_fidelities) < min_if:
                     min_if = min(instance_fidelities)
 
-            method = 'MASALA'
-            with open(f'saved/results/{args.dataset}/{method}_{args.dataset}_{model}#_{args.experiment_num}_{args.num_instances}.pck', 'rb') as file:
-                masala_result = pck.load(file)
-
-            for n in range(len(masala_result['explanations'])):
-                explanation = masala_result['explanations'][n]
-                instance_data = masala_result['instance_data'][n]
-                local_model = explanation.exp_model
-                # Sort instance data and exp based on l)
-                for k in range(len(features[args.dataset])):
-                    top_k_instance_prediction = predict_with_top_k_features(local_model.coef_, local_model, instance_data, k)
-                    result_dict[method]['instance_fidelity'].append(calculate_instance_fidelity(top_k_instance_prediction, masala_result['model_instance_prediction'][n]))
-
-                    top_k_perturbation_predictions = []
-                    for p in range(len(explanation.local_x)):
-                        top_k_perturbation_predictions.append(predict_with_top_k_features(local_model.coef_, local_model, explanation.local_x[p], k))
-                    result_dict[method]['local_fidelity'].append(calculate_local_fidelity(top_k_perturbation_predictions, explanation.local_model_y))
-
-            local_fidelities = [np.mean(result_dict[method]['local_fidelity']) for k in range(len(features[args.dataset]))]
-            instance_fidelities = [np.mean(result_dict[method]['instance_fidelity']) for k in range(len(features[args.dataset]))]
-            axes[i].plot(local_fidelities, label=method, color=masala_color, linestyle='--')
-            axes[i].plot(instance_fidelities, label=method, color=masala_color)
-
+            axes[i].plot(range(1, len(features[args.dataset])+1), masala_local_fidelities, label='MASALA', color=masala_color, linestyle='--')
+            axes[i].plot(range(1, len(features[args.dataset])+1), masala_instance_fidelities, label='MASALA', color=masala_color)
+#
+#
             axes[i].set_title(r'$\sigma$ = ' + str(kernel_width))
             if i == 0:
                 axes[i].set_ylabel('MAE')
 #            else:
 #                axes[i].set_yticklabels([])
-            axes[i].set_xticks(range(len(features[args.dataset]))[::2])
+            axes[i].set_xticks(range(1, len(features[args.dataset])+1)[::2])
 #        axes[0][i].set_xlabel('Number of Features')
             axes[i].set_xlabel('# of Features')
+#            axes[i].set_yscale('log')
 #    axes[0][i].legend()
 #        for i in range(len(kernel_widths)):
 #            axes[i].set_ylim(min_if, max_if)
@@ -305,14 +333,34 @@ def varying_interpretability(kernel_widths):
 
 
 #    axes[1][i].legend()
-        fig.legend(['LIME - Local', 'CHILLI - Local', 'LIME - Instance', 'CHILLI - Instance', 'MASALA - Local', 'MASALA - Instance'], loc='upper center', ncols=2, bbox_to_anchor=(0.5, 1.30))
+        fig.legend(['LIME - Local', 'LIME - Instance', 'CHILLI - Local', 'CHILLI - Instance', 'MASALA - Local', 'MASALA - Instance'], loc='upper center', ncols=2, bbox_to_anchor=(0.5, 1.30))
         fig.savefig(f'Figures/{args.dataset}_{model}_interpretability.png', bbox_inches='tight', dpi=300)
 
+def exp_consistency(sparsity_threshold=0.02, starting_k=5):
+    repeated_explanations = defaultdict(list)
+    experiments = list(range(1,5))
+    for e_id in experiments:
+        with open(f'saved/results/{dataset}/MASALA_{args.dataset}_{args.model_type}#_{e_id}_{args.num_instances}_{sparsity_threshold}_{starting_k}.pck', 'rb') as file:
+            result = pck.load(file)
+        for n in range(len(result['explanations'])):
+            repeated_explanations[result['instance_indices'][n]].append(np.array(result['explanations'][n].exp_model.coef_))
 
 
-for dataset in ['MIDAS', 'housing', 'webTRIS']:
+    for instance in repeated_explanations.keys():
+        print(np.transpose(repeated_explanations[instance]))
+        sns.heatmap(np.transpose(repeated_explanations[instance]), annot=True, fmt='.2f', cmap='coolwarm')
+
+        plt.show()
+
+
+
+
+
+
+for dataset in ['MIDAS', 'housing', 'webTRIS'][:1]:
     args.dataset = dataset
-    fidelities()
+#    fidelities()
+    exp_consistency()
 #    masala_fidelities()
 #    exp_variance_box_plot()
 #    varying_interpretability(kernel_widths[:5])

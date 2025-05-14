@@ -150,6 +150,7 @@ def toggle_view(view_mode, dataset, model_type, explanation_instance):
     print(f'Generating Plot for {MASALAExplainer.dataset} with {MASALAExplainer.model_type} model')
     if view_mode == 'explanation' or callback_context.triggered[0]['prop_id'] == 'explanation-instance.value':
         explanation, local_error = MASALAExplainer.explain_instance(instance=explanation_instance)
+        print(explanation.exp_model.coef_)
         fig = MASALAExplainer.plot_data(explanation=explanation)
     elif view_mode == 'clustering':
         fig = MASALAExplainer.plot_all_clustering()

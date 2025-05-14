@@ -55,7 +55,7 @@ parser.add_argument('--results', action=argparse.BooleanOptionalAction)
 parser.add_argument('--lime', action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument('--chilli', action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument('--masala', action=argparse.BooleanOptionalAction, default=True)
-parser.add_argument('-lmc', '--load_masala_clustering', action=argparse.BooleanOptionalAction, default=True)
+parser.add_argument('-lmc', '--load_masala_clustering', action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument('--verbose', action=argparse.BooleanOptionalAction, default=False)
 
 
@@ -77,7 +77,7 @@ def main(dataset=None, model_type=None):
 
     categorical_features = [base_model.features.index(feature) for feature in base_model.discrete_features]
 
-    random.seed(args.e_id*10)
+    random.seed(42)
 
     # ---- Same Instances ----
     if args.exp_mode == 'same':
@@ -119,7 +119,9 @@ def main(dataset=None, model_type=None):
         LIMEExplainer.build_explainer(mode='regression', kernel_width=kernel_width, categorical_features=categorical_features)
 
     if args.masala:
-        MASALAExplainer = masala.MASALA(base_model.model, model_type, base_model.x_test, base_model.y_test, base_model.y_test_pred, dataset, base_model.features, base_model.target_feature, base_model.discrete_features, sparsity_threshold=0.02, coverage_threshold=0.05, starting_k=5, neighbourhood_threshold=0.05, preload_clustering=args.load_masala_clustering)
+        sparsity_threshold= 0.02
+        starting_k = 5
+        MASALAExplainer = masala.MASALA(base_model.model, model_type, base_model.x_test, base_model.y_test, base_model.y_test_pred, dataset, base_model.features, base_model.target_feature, base_model.discrete_features, sparsity_threshold=sparsity_threshold, coverage_threshold=0.05, starting_k=starting_k, neighbourhood_threshold=0.05, preload_clustering=args.load_masala_clustering, experiment_id=args.e_id)
         if not args.load_masala_clustering:
             MASALAExplainer.run_clustering()
 
@@ -250,7 +252,7 @@ def main(dataset=None, model_type=None):
             with open(f'saved/results/{dataset}/CHILLI_{dataset}_{model_type}#_{args.e_id}_{args.num_instances}_kw={kernel_width}.pck', 'wb') as f:
                 pck.dump(chilli_results, f)
         if args.masala:
-            with open(f'saved/results/{dataset}/MASALA_{dataset}_{model_type}#_{args.e_id}_{args.num_instances}.pck', 'wb') as f:
+            with open(f'saved/results/{dataset}/MASALA_{dataset}_{model_type}#_{args.e_id}_{args.num_instances}_{sparsity_threshold}_{starting_k}.pck', 'wb') as f:
                 pck.dump(masala_results, f)
 
 
@@ -260,7 +262,7 @@ if __name__ == '__main__':
                     'MIDAS': ['GBR', 'SVR', 'RNN'],
                     'webTRIS': ['GBR', 'SVR', 'RF'],
                     }
-    for dataset in dataset_models.keys():
+    for dataset in list(dataset_models.keys())[1:2]:
 #    for dataset in ['webTRIS']:
         for model_type in dataset_models[dataset]:
             print(f'Running {dataset} with {model_type}')

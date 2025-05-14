@@ -162,6 +162,7 @@ class LLCExplanation():
 #        print(f'Ground Truth: {ground_truth}')
 #        print(f'Model Prediction: { instance_prediction }')
         print(f'LLC Explanation prediction: { explanation.target_exp_y }')
+        print(f'Num local points: { len(explanation.local_x) }')
 
 #        fig = self.plot_data(plotting_data)
         return explanation, local_error

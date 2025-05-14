@@ -11,7 +11,7 @@ import plotly.express as px
 
 class MASALA:
 
-    def __init__(self, model, model_type, x_test, y_test, y_pred, dataset, features, target_feature, discrete_features, sparsity_threshold, coverage_threshold, starting_k, neighbourhood_threshold, num_workers=1, preload_clustering=True):
+    def __init__(self, model, model_type, x_test, y_test, y_pred, dataset, features, target_feature, discrete_features, sparsity_threshold, coverage_threshold, starting_k, neighbourhood_threshold, num_workers=1, preload_clustering=True, experiment_id=1):
         self.model = model
         self.model_type = model_type
         self.x_test = x_test
@@ -26,7 +26,7 @@ class MASALA:
         self.starting_k = starting_k
         self.neighbourhood_threshold = neighbourhood_threshold
         self.explanation_generator = None
-        self.experiment_id = 1
+        self.experiment_id = experiment_id
         self.num_workers = num_workers
 
         if preload_clustering:
@@ -37,6 +37,7 @@ class MASALA:
     def run_clustering(self, ):
         self.clustering_generator = LLCGenerator(model=self.model, model_type=self.model_type, x_test=self.x_test, y_pred=self.y_pred, features=self.features, target_name=self.target_feature, discrete_features=self.discrete_features, dataset=self.dataset, sparsity_threshold=self.sparsity_threshold, coverage_threshold=self.coverage_threshold, starting_k=self.starting_k, neighbourhood_threshold=self.neighbourhood_threshold, experiment_id=self.experiment_id, num_workers=self.num_workers)
         self.feature_ensembles = self.clustering_generator.feature_ensembles
+        self.initialise_explainer()
 
 #        self.clustering_generator.matplot_all_clustering()
 
