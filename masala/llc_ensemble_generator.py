@@ -184,7 +184,6 @@ class LLCGenerator():
         return i, feature_ensembles
 
     def multiworker_clustering(self,num_workers):
-        print(f'{self.dataset}_{self.sparsity_threshold}_{self.coverage_threshold}_{self.starting_k}_{self.neighbourhood_threshold}')
 #
 #        def distribute_features_to_workers(N, w):
 #            chunk_size = N // w

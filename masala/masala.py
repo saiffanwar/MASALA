@@ -35,6 +35,7 @@ class MASALA:
 
 
     def run_clustering(self, ):
+        print(f'Clustering {self.dataset} with model {self.model_type}, sparsity threshold {self.sparsity_threshold}, coverage threshold {self.coverage_threshold}, starting k {self.starting_k}, neighbourhood threshold {self.neighbourhood_threshold} and experiment id {self.experiment_id}...')
         self.clustering_generator = LLCGenerator(model=self.model, model_type=self.model_type, x_test=self.x_test, y_pred=self.y_pred, features=self.features, target_name=self.target_feature, discrete_features=self.discrete_features, dataset=self.dataset, sparsity_threshold=self.sparsity_threshold, coverage_threshold=self.coverage_threshold, starting_k=self.starting_k, neighbourhood_threshold=self.neighbourhood_threshold, experiment_id=self.experiment_id, num_workers=self.num_workers)
         self.feature_ensembles = self.clustering_generator.feature_ensembles
         self.initialise_explainer()

@@ -403,8 +403,8 @@ def exp_consistency(sparsity_threshold=0.02, starting_k=5, kw=0.1):
 
 
 
-exp_consistency()
-#    fidelities()
+#exp_consistency()
+fidelities()
 #    masala_fidelities()
 #    exp_variance_box_plot()
 #    varying_interpretability(kernel_widths[:5])

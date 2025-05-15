@@ -152,7 +152,6 @@ class LinearClustering():
 #        else:
         recluster = True
 #        self.gaps = self.find_gaps(self.x)
-        print(f'Clustering {self.feature_name} with K={K} clusters.')
         if not self.plotting:
             fig=None
 #        while iter < num_iterations:
@@ -601,10 +600,10 @@ class LinearClustering():
                 is_sparsity = True
 
             if is_sparsity or is_coverage:
-                if is_sparsity:
-                    print(f'Cluster {i} is sparse with sparsity {sparsity:.4f}')
-                if is_coverage:
-                    print(f'Cluster {i} has low coverage with coverage {coverage:.4f}')
+#                if is_sparsity:
+#                    print(f'Cluster {i} is sparse with sparsity {sparsity:.4f}')
+#                if is_coverage:
+#                    print(f'Cluster {i} has low coverage with coverage {coverage:.4f}')
                 return i, clustered_data
         return None, clustered_data
 
